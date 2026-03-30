@@ -960,7 +960,7 @@ body.light .sp-map-more { color: rgba(0,0,0,0.3); }
     <div class="sp-divider"></div>
 
     <!-- MAPS section -->
-    <div class="sp-section-label">MAPS</div>
+    <div class="sp-section-label" id="sp-maps-label">MAPS</div>
 
     <!-- New Map button -->
     <div class="sp-row" onclick="spNewMap()" style="margin:4px 12px 8px;border-radius:14px;background:rgba(124,106,247,0.12);border:1px solid rgba(124,106,247,0.25);">
@@ -999,14 +999,14 @@ body.light .sp-map-more { color: rgba(0,0,0,0.3); }
   <div id="map-rename-row" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
     <input id="map-rename-input" type="text" maxlength="32"
       style="flex:1;padding:13px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:#e8e6ff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;font-weight:600;outline:none;"
-      placeholder="Map name"
+      id="map-rename-input-el" placeholder="Map name"
       onkeydown="if(event.key==='Enter')confirmRenameMap();">
-    <button onclick="confirmRenameMap()" style="padding:13px 18px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;">Save</button>
+    <button onclick="confirmRenameMap()" style="padding:13px 18px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;"><span id="map-save-label">Save</span></button>
   </div>
   <!-- Delete -->
-  <button id="map-delete-btn" onclick="confirmDeleteMap()" style="width:100%;padding:14px;border-radius:14px;border:none;background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.25);color:#ff6060;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:700;cursor:pointer;">Delete Map</button>
+  <button id="map-delete-btn" onclick="confirmDeleteMap()" style="width:100%;padding:14px;border-radius:14px;border:none;background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.25);color:#ff6060;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:700;cursor:pointer;"><span id="map-delete-label">Delete Map</span></button>
   <!-- Cancel -->
-  <button onclick="closeMapOptions()" style="width:100%;padding:14px;border-radius:14px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;">Cancel</button>
+  <button id="map-cancel-btn" onclick="closeMapOptions()" style="width:100%;padding:14px;border-radius:14px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;"><span id="map-cancel-label">Cancel</span></button>
 </div>
 
 <!-- Onboarding -->
@@ -1129,6 +1129,10 @@ const _sb = supabase.createClient(
 
 <canvas id="canvas"></canvas>
 
+<div id="guest-banner" style="display:none;position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:150;background:rgba(247,192,106,0.15);border:1px solid rgba(247,192,106,0.35);color:#f7c06a;padding:8px 16px;border-radius:20px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:12px;font-weight:600;display:none;align-items:center;gap:10px;white-space:nowrap;backdrop-filter:blur(16px);">
+  <span id="guest-banner-text">Guest mode — data is not backed up</span>
+  <button onclick="closeSidePanel();setTimeout(doSignIn,200);" id="guest-banner-btn" style="background:rgba(247,192,106,0.25);border:1px solid rgba(247,192,106,0.4);color:#f7c06a;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;cursor:pointer;font-family:-apple-system,sans-serif;">Sign in</button>
+</div>
 <div id="hud">
   <div id="header">
     <div style="display:flex;align-items:center;gap:10px;">
@@ -1622,6 +1626,14 @@ STRINGS = {
     color:        'Color',
     streak:       'd streak',
     hoursUnit:    'h',
+    guestWarning: 'Guest mode — data is not backed up',
+    signInToSave: 'Sign in to save',
+    newMap:       'New Map',
+    deleteMap:    'Delete Map',
+    renameMap:    'Rename',
+    saveName:     'Save',
+    mapsSection:  'MAPS',
+    settingsSection: 'SETTINGS',
   },
   ru: {
     newStream:    'Новый поток',
@@ -1654,6 +1666,14 @@ STRINGS = {
     color:        'Цвет',
     streak:       'д подряд',
     hoursUnit:    'ч',
+    guestWarning: 'Гостевой режим — данные не сохраняются',
+    signInToSave: 'Войти для сохранения',
+    newMap:       'Новая карта',
+    deleteMap:    'Удалить карту',
+    renameMap:    'Переименовать',
+    saveName:     'Сохранить',
+    mapsSection:  'КАРТЫ',
+    settingsSection: 'НАСТРОЙКИ',
   }
 };
 
@@ -2516,7 +2536,7 @@ async function _handleAuthUrl(url) {
             if (Cap) await Cap.remove({ key: "pkce_verifier" });
             localStorage.removeItem("pkce_verifier");
             try { window.Capacitor.Plugins.Browser.close(); } catch(e) {}
-            spRefresh(); renderAll(); return true;
+            spRefresh(); updateGuestBanner(); renderAll(); return true;
           }
         }
       }
@@ -2546,7 +2566,7 @@ async function _handleAuthUrl(url) {
       if (data?.session?.user) {
         _sbUser = data.session.user;
         try { window.Capacitor.Plugins.Browser.close(); } catch(e) {}
-        spRefresh(); renderAll(); return true;
+        spRefresh(); updateGuestBanner(); renderAll(); return true;
       }
     }
   } catch(e) {}
@@ -2610,6 +2630,7 @@ async function doSignOut(){
   renderAll();
   updateStats();
   spRefresh();
+  updateGuestBanner();
 }
 
 async function doDeleteAccount() {
@@ -2645,6 +2666,16 @@ function closeSidePanel() {
   setTimeout(() => { p.style.visibility = 'hidden'; }, 360);
 }
 
+function updateGuestBanner() {
+  const banner = document.getElementById('guest-banner');
+  if (!banner) return;
+  if (!_sbUser) {
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
 function spRefresh() {
   const status = document.getElementById('sp-status');
   const statusSub = document.getElementById('sp-status-sub');
@@ -2669,7 +2700,7 @@ function spRefresh() {
       avatarLetter.textContent = name.charAt(0).toUpperCase();
       if (avatarImg) avatarImg.style.display = 'none';
     }
-    if (syncStatus) { syncStatus.style.display = 'block'; syncStatus.textContent = 'Streams backed up'; }
+    if (syncStatus) { syncStatus.style.display = 'block'; syncStatus.textContent = SP_I18N[_spLang]?.streamsBackedUp || 'Streams backed up'; }
     document.getElementById('sp-header').style.cursor = 'pointer';
     if (spOut) spOut.style.display = 'none';
     if (spIn) spIn.style.display = 'none';
@@ -2834,7 +2865,9 @@ function spSyncTheme() {
 }
 
 function spSignIn() { closeSidePanel(); setTimeout(doSignIn, 350); }
-function spSignOut() { closeSidePanel(); setTimeout(doSignOut, 350); }
+function spSignOut() {
+  // banner updated below via _sbUser=null path
+ closeSidePanel(); setTimeout(doSignOut, 350); }
 function spDeleteAccount() { doDeleteAccount(); closeSidePanel(); }
 
 // ── i18n ──────────────────────────────────────────────────────
@@ -2846,7 +2879,17 @@ SP_I18N = {
     deleteAccount: 'Delete Account',
     ob_tagline: 'Track hours across\nevery area of your life',
     ob_guest: 'Continue as Guest',
-    ob_note: 'Works offline. Sign in to back up across devices.'
+    ob_note: 'Works offline. Sign in to back up across devices.',
+    streamsBackedUp: 'Streams backed up',
+    newMap: 'New Map',
+    deleteMap: 'Delete Map',
+    saveName: 'Save',
+    cancelBtn: 'Cancel',
+    mapsSection: 'MAPS',
+    settingsSection: 'SETTINGS',
+    mapPlaceholder: 'Map name',
+    guestWarning: 'Guest mode — data is not backed up',
+    signInToSave: 'Sign in to save',
   },
   ru: {
     darkMode: 'Тёмная тема', lightMode: 'Светлая тема',
@@ -2855,7 +2898,17 @@ SP_I18N = {
     deleteAccount: 'Удалить аккаунт',
     ob_tagline: 'Отслеживай часы в каждой\nсфере своей жизни',
     ob_guest: 'Продолжить как гость',
-    ob_note: 'Работает офлайн. Войдите для синхронизации.'
+    ob_note: 'Работает офлайн. Войдите для синхронизации.',
+    streamsBackedUp: 'Данные сохранены',
+    newMap: 'Новая карта',
+    deleteMap: 'Удалить карту',
+    saveName: 'Сохранить',
+    cancelBtn: 'Отмена',
+    mapsSection: 'КАРТЫ',
+    settingsSection: 'НАСТРОЙКИ',
+    mapPlaceholder: 'Название карты',
+    guestWarning: 'Гостевой режим — данные не сохраняются',
+    signInToSave: 'Войти для сохранения',
   }
 };
 
@@ -2871,6 +2924,7 @@ function spSetLang(lang) {
 
 function spSyncLang() {
   const lang = _spLang;
+  spSyncTheme();
   const s = SP_I18N[lang] || SP_I18N.en;
   const enBtn = document.getElementById('sp-en');
   const ruBtn = document.getElementById('sp-ru');
@@ -2884,6 +2938,30 @@ function spSyncLang() {
   if (daEl) daEl.textContent = s.deleteAccount;
   const llEl = document.getElementById('sp-lang-label');
   if (llEl) llEl.textContent = s.language;
+  const mapsLbl = document.getElementById('sp-maps-label');
+  if (mapsLbl) mapsLbl.textContent = s.mapsSection;
+  const genLbl = document.getElementById('sp-general-label');
+  if (genLbl) genLbl.textContent = s.settingsSection;
+  const newMapLbl = document.getElementById('sp-new-map-label');
+  if (newMapLbl) newMapLbl.textContent = s.newMap;
+  const mapSaveLbl = document.getElementById('map-save-label');
+  if (mapSaveLbl) mapSaveLbl.textContent = s.saveName;
+  const mapDelLbl = document.getElementById('map-delete-label');
+  if (mapDelLbl) mapDelLbl.textContent = s.deleteMap;
+  const mapCancelLbl = document.getElementById('map-cancel-label');
+  if (mapCancelLbl) mapCancelLbl.textContent = s.cancelBtn;
+  const mapInput = document.getElementById('map-rename-input');
+  if (mapInput) mapInput.placeholder = s.mapPlaceholder;
+  // Guest banner
+  const guestTxt = document.getElementById('guest-banner-text');
+  if (guestTxt) guestTxt.textContent = s.guestWarning;
+  const guestBtn = document.getElementById('guest-banner-btn');
+  if (guestBtn) guestBtn.textContent = s.signInToSave;
+  // Profile panel labels
+  const signoutLbl = document.getElementById('sp-profile-signout-label');
+  if (signoutLbl) signoutLbl.textContent = s.signOut;
+  const deleteLbl = document.getElementById('sp-profile-delete-label');
+  if (deleteLbl) deleteLbl.textContent = s.deleteAccount;
 }
 
 // ── Onboarding ────────────────────────────────────────────────
@@ -3275,9 +3353,13 @@ _updateFitBtn();
 // ── App init ──
 resizeCanvas();
 applyLang();
+spSyncLang();
+spSyncTheme();
+spRefresh();
 load().then(async () => {
   render();
   updateStats();
+  updateGuestBanner();
   // Check for pending OAuth URL stored by MainActivity
   try {
     if (Cap) {
