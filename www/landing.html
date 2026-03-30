@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dStream — Track What You Live For</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: #7c6af7;
+  --accent2: #a78bfa;
+  --bg: #07070f;
+  --text: #e8e6ff;
+  --muted: rgba(232,230,255,0.42);
+  --glass: rgba(255,255,255,0.05);
+  --border: rgba(255,255,255,0.1);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;overflow-x:hidden;}
+
+/* grain */
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9998;opacity:0.55;}
+
+/* glows */
+.glow{position:fixed;border-radius:50%;filter:blur(110px);pointer-events:none;z-index:0;}
+.g1{width:550px;height:550px;background:rgba(124,106,247,0.16);top:-180px;left:-80px;animation:dA 20s ease-in-out infinite alternate;}
+.g2{width:380px;height:380px;background:rgba(167,139,250,0.09);bottom:-80px;right:-60px;animation:dB 25s ease-in-out infinite alternate;}
+.g3{width:280px;height:280px;background:rgba(99,74,238,0.13);top:45%;left:55%;animation:dC 17s ease-in-out infinite alternate;}
+@keyframes dA{to{transform:translate(70px,55px);}}
+@keyframes dB{to{transform:translate(-50px,-35px);}}
+@keyframes dC{to{transform:translate(35px,-70px);}}
+
+/* perspective grid */
+.pgrid{position:fixed;bottom:0;left:0;right:0;height:52vh;z-index:0;opacity:0.14;pointer-events:none;}
+.pgrid svg{width:100%;height:100%;}
+
+/* nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 36px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.05);background:rgba(7,7,15,0.55);}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;letter-spacing:-0.03em;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:9px;}
+.logo-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);animation:pulse 2.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 10px var(--accent);}50%{opacity:0.55;box-shadow:0 0 3px var(--accent);}}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:50px;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;text-decoration:none;border:none;letter-spacing:0.01em;}
+.btn-ghost{background:var(--glass);border:1px solid var(--border);color:var(--muted);}
+.btn-ghost:hover{background:rgba(255,255,255,0.09);color:var(--text);border-color:rgba(255,255,255,0.18);}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 0 28px rgba(124,106,247,0.35);}
+.btn-primary:hover{background:#8f7ef9;box-shadow:0 0 36px rgba(124,106,247,0.5);transform:translateY(-1px);}
+.btn-primary:active{transform:translateY(0);}
+.btn-google{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.13);color:var(--text);font-size:14px;padding:14px 28px;border-radius:50px;}
+.btn-google:hover{background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.22);transform:translateY(-1px);}
+.btn-google svg{flex-shrink:0;}
+.btn-apk{background:transparent;border:1px solid rgba(124,106,247,0.35);color:var(--accent2);font-size:14px;padding:14px 28px;border-radius:50px;}
+.btn-apk:hover{background:rgba(124,106,247,0.1);border-color:var(--accent);transform:translateY(-1px);}
+
+/* hero */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 100px;text-align:center;position:relative;z-index:1;}
+.eyebrow{font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:var(--accent2);margin-bottom:26px;opacity:0;animation:up 0.8s ease 0.2s forwards;}
+h1{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(48px,8.5vw,104px);line-height:0.94;letter-spacing:-0.04em;margin-bottom:30px;opacity:0;animation:up 0.8s ease 0.4s forwards;}
+h1 em{font-style:normal;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 55%,#c4b5fd 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sub{font-size:15px;line-height:1.75;color:var(--muted);max-width:420px;margin:0 auto 52px;font-weight:300;opacity:0;animation:up 0.8s ease 0.6s forwards;}
+.hero-btns{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;opacity:0;animation:up 0.8s ease 0.8s forwards;}
+@keyframes up{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+
+/* features */
+.features{position:relative;z-index:1;padding:80px 24px 100px;max-width:960px;margin:0 auto;}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;}
+.feat{background:var(--glass);border:1px solid var(--border);border-radius:20px;padding:28px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);transition:border-color 0.25s,transform 0.25s;}
+.feat:hover{border-color:rgba(124,106,247,0.35);transform:translateY(-3px);}
+.feat-icon{font-size:26px;margin-bottom:16px;line-height:1;}
+.feat-title{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin-bottom:8px;color:var(--text);}
+.feat-desc{font-size:12px;line-height:1.7;color:var(--muted);font-weight:300;}
+
+/* cta */
+.cta{position:relative;z-index:1;padding:60px 24px 120px;text-align:center;}
+.cta-card{max-width:520px;margin:0 auto;background:rgba(124,106,247,0.07);border:1px solid rgba(124,106,247,0.2);border-radius:28px;padding:52px 40px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);}
+.cta h2{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(28px,4vw,42px);letter-spacing:-0.03em;margin-bottom:14px;}
+.cta p{font-size:13px;color:var(--muted);margin-bottom:36px;line-height:1.7;font-weight:300;}
+.cta-btns{display:flex;flex-direction:column;gap:12px;align-items:center;}
+
+/* user pill */
+#user-pill{display:none;align-items:center;gap:10px;background:var(--glass);border:1px solid var(--border);border-radius:50px;padding:6px 16px 6px 8px;font-size:12px;color:var(--muted);}
+#user-pill img{width:26px;height:26px;border-radius:50%;object-fit:cover;}
+#user-pill span{color:var(--text);}
+.pill-signout{background:none;border:none;color:rgba(232,230,255,0.3);font-size:11px;cursor:pointer;font-family:'DM Mono',monospace;margin-left:4px;padding:2px 6px;border-radius:20px;transition:color 0.2s;}
+.pill-signout:hover{color:var(--text);}
+
+/* toast */
+#toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(124,106,247,0.18);border:1px solid rgba(124,106,247,0.35);color:var(--text);padding:10px 22px;border-radius:50px;font-size:12px;opacity:0;transition:all 0.35s;z-index:1000;backdrop-filter:blur(16px);pointer-events:none;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* footer */
+footer{position:relative;z-index:1;text-align:center;padding:32px 24px;border-top:1px solid rgba(255,255,255,0.05);font-size:11px;color:rgba(232,230,255,0.2);letter-spacing:0.05em;}
+
+@media(max-width:600px){
+  nav{padding:16px 20px;}
+  .cta-card{padding:36px 24px;}
+}
+</style>
+</head>
+<body>
+
+<div class="glow g1"></div>
+<div class="glow g2"></div>
+<div class="glow g3"></div>
+
+<!-- perspective grid -->
+<div class="pgrid">
+<svg viewBox="0 0 1440 400" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gf" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7c6af7" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#7c6af7" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+  <!-- horizontal lines -->
+  <line x1="0" y1="390" x2="1440" y2="390" stroke="url(#gf)" stroke-width="1"/>
+  <line x1="144" y1="320" x2="1296" y2="320" stroke="url(#gf)" stroke-width="0.8"/>
+  <line x1="288" y1="260" x2="1152" y2="260" stroke="url(#gf)" stroke-width="0.6"/>
+  <line x1="400" y1="210" x2="1040" y2="210" stroke="url(#gf)" stroke-width="0.45"/>
+  <line x1="490" y1="168" x2="950" y2="168" stroke="url(#gf)" stroke-width="0.3"/>
+  <line x1="560" y1="134" x2="880" y2="134" stroke="url(#gf)" stroke-width="0.2"/>
+  <line x1="615" y1="106" x2="825" y2="106" stroke="url(#gf)" stroke-width="0.12"/>
+  <!-- vertical lines fanning from vp -->
+  <line x1="720" y1="0" x2="0" y2="400" stroke="url(#gf)" stroke-width="0.6"/>
+  <line x1="720" y1="0" x2="240" y2="400" stroke="url(#gf)" stroke-width="0.6"/>
+  <line x1="720" y1="0" x2="480" y2="400" stroke="url(#gf)" stroke-width="0.6"/>
+  <line x1="720" y1="0" x2="720" y2="400" stroke="url(#gf)" stroke-width="0.8"/>
+  <line x1="720" y1="0" x2="960" y2="400" stroke="url(#gf)" stroke-width="0.6"/>
+  <line x1="720" y1="0" x2="1200" y2="400" stroke="url(#gf)" stroke-width="0.6"/>
+  <line x1="720" y1="0" x2="1440" y2="400" stroke="url(#gf)" stroke-width="0.6"/>
+  <!-- checkers on lanes -->
+  <circle cx="360" cy="355" r="22" fill="#7c6af7" opacity="0.55"/>
+  <circle cx="360" cy="355" r="16" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+  <circle cx="600" cy="300" r="18" fill="#a78bfa" opacity="0.5"/>
+  <circle cx="600" cy="300" r="13" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <circle cx="720" cy="270" r="15" fill="#7c6af7" opacity="0.45"/>
+  <circle cx="870" cy="310" r="20" fill="#6344ee" opacity="0.5"/>
+  <circle cx="870" cy="310" r="14" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+  <circle cx="1080" cy="348" r="25" fill="#a78bfa" opacity="0.5"/>
+  <circle cx="1080" cy="348" r="18" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+</svg>
+</div>
+
+<!-- NAV -->
+<nav>
+  <a class="logo" href="#">
+    <span class="logo-dot"></span>
+    dStream
+  </a>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div id="user-pill">
+      <img id="up-avatar" src="" alt="">
+      <span id="up-name"></span>
+      <button class="pill-signout" onclick="signOut()">sign out</button>
+    </div>
+    <button class="btn btn-ghost" id="nav-signin-btn" onclick="signInWithGoogle()" style="display:none;">Sign in</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="eyebrow">Personal habit tracker</div>
+  <h1>Track what<br>you <em>live for</em></h1>
+  <p class="sub">Each life domain is a checker on a perspective board. Log hours and watch them move. Simple, visual, yours.</p>
+  <div class="hero-btns">
+    <button class="btn btn-google" id="hero-signin-btn" onclick="signInWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+      Sign in with Google
+    </button>
+    <a class="btn btn-primary" id="hero-open-btn" href="index.html" style="display:none;">Open App →</a>
+    <a class="btn btn-apk" id="apk-btn" href="app-debug.apk" download>
+      ↓ Download Android APK
+    </a>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="features-grid">
+    <div class="feat">
+      <div class="feat-icon">◎</div>
+      <div class="feat-title">Life domains as checkers</div>
+      <div class="feat-desc">Each habit or domain lives as a flat disc on a perspective grid. The more hours you log, the deeper it moves into the board.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">☁</div>
+      <div class="feat-title">Synced across devices</div>
+      <div class="feat-desc">Sign in with Google and your streams are backed up and available everywhere — Android app or web browser.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">◑</div>
+      <div class="feat-title">Dark & light mode</div>
+      <div class="feat-desc">Deep space dark by default. Switch to light when the sun's out. Your eyes, your call.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">⊕</div>
+      <div class="feat-title">EN / RU</div>
+      <div class="feat-desc">Full interface in English and Russian. Switch instantly without restarting.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">✦</div>
+      <div class="feat-title">Offline first</div>
+      <div class="feat-desc">Works without a connection. Sign in later to back up. No account required to start.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">▦</div>
+      <div class="feat-title">Home screen widgets</div>
+      <div class="feat-desc">Android widgets show your top streams and the board grid at a glance, without opening the app.</div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="cta-card">
+    <h2>Start tracking<br>today</h2>
+    <p>Open the web version right here, or download the Android app and take it with you.</p>
+    <div class="cta-btns">
+      <button class="btn btn-google" style="width:100%;justify-content:center;" onclick="signInWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+        Sign in with Google — open web app
+      </button>
+      <a class="btn btn-apk" style="width:100%;justify-content:center;" href="app-debug.apk" download>
+        ↓ Download Android APK
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>dStream · personal habit tracker · built with Capacitor + Supabase</footer>
+
+<div id="toast"></div>
+
+<script src="supabase.js"></script>
+<script>
+const _sb = supabase.createClient(
+  'https://ayxfpslgoihretkfbqwh.supabase.co',
+  'sb_publishable_G9np31a1ppKTG2mgPaK50g_DteosV6x'
+);
+
+function showToast(msg, ms=2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+function setUser(user) {
+  const pill = document.getElementById('user-pill');
+  const navBtn = document.getElementById('nav-signin-btn');
+  const openBtn = document.getElementById('hero-open-btn');
+  const signinBtn = document.getElementById('hero-signin-btn');
+  if (!user) {
+    pill.style.display = 'none';
+    navBtn.style.display = 'flex';
+    if (openBtn) openBtn.style.display = 'none';
+    if (signinBtn) signinBtn.style.display = 'inline-flex';
+    return;
+  }
+  const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'you';
+  const avatar = user.user_metadata?.avatar_url || '';
+  document.getElementById('up-name').textContent = name;
+  const img = document.getElementById('up-avatar');
+  if (avatar) { img.src = avatar; img.style.display = 'block'; }
+  pill.style.display = 'flex';
+  navBtn.style.display = 'none';
+  if (openBtn) openBtn.style.display = 'inline-flex';
+  if (signinBtn) signinBtn.style.display = 'none';
+}
+
+async function signInWithGoogle() {
+  const redirectTo = window.location.href.split('?')[0].split('#')[0];
+  const { error } = await _sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo,
+      queryParams: { access_type: 'offline', prompt: 'consent' }
+    }
+  });
+  if (error) showToast('Sign-in error: ' + error.message);
+}
+
+async function signOut() {
+  await _sb.auth.signOut();
+  setUser(null);
+  showToast('Signed out');
+}
+
+// On load — check session (handles redirect back from Google)
+(async () => {
+  const { data: { session } } = await _sb.auth.getSession();
+  if (session?.user) {
+    setUser(session.user);
+    // If this is a fresh OAuth redirect, send to app
+    const hash = window.location.hash;
+    const params = new URLSearchParams(window.location.search);
+    if (hash.includes('access_token') || params.get('code')) {
+      showToast('Signed in! Loading your streams…');
+      setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+    }
+  } else {
+    setUser(null);
+  }
+
+  _sb.auth.onAuthStateChange((_event, session) => {
+    setUser(session?.user || null);
+  });
+})();
+</script>
+</body>
+</html>

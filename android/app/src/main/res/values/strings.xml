@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">dStream</string>
+    <string name="title_activity_main">dStream</string>
+    <string name="package_name">com.lifestreams.app</string>
+    <string name="custom_url_scheme">com.lifestreams.app</string>
+    <!-- Life Streams widget labels (merge into your existing strings.xml) -->
+    <string name="widget_grid_desc">Life Streams — perspective grid of all your streams</string>
+    <string name="widget_top_desc">Life Streams — top 3 streams by hours logged</string>
+</resources>

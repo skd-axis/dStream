@@ -1,0 +1,19 @@
+{
+  "appId": "com.lifestreams.app",
+  "appName": "Life Streams",
+  "webDir": "www",
+  "plugins": {
+    "Preferences": {
+      "group": "CAPPreferences"
+    },
+    "GoogleAuth": {
+      "scopes": [
+        "profile",
+        "email"
+      ],
+      "serverClientId": "759581587113-dhuflj6tnn2jr6o8tebga7m68j9dihfq.apps.googleusercontent.com",
+      "androidClientId": "759581587113-dnognisr6begfkduuq1bkkhn361n1oej.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
+}

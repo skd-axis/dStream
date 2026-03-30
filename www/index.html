@@ -1,0 +1,3298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:,">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a12">
+<title>dStream</title>
+
+
+<!-- PWA: inject manifest as blob so Chrome recognises it as installable -->
+<script>
+(function(){
+  const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="80" fill="#0a0a12"/>
+    <circle cx="180" cy="320" r="72" fill="#7c6af7" opacity=".9"/>
+    <circle cx="332" cy="260" r="56" fill="#f7c06a" opacity=".9"/>
+    <circle cx="256" cy="200" r="44" fill="#6af7b8" opacity=".9"/>
+    <line x1="180" y1="320" x2="180" y2="420" stroke="#7c6af7" stroke-width="6" stroke-linecap="round"/>
+    <line x1="332" y1="260" x2="332" y2="420" stroke="#f7c06a" stroke-width="6" stroke-linecap="round"/>
+    <line x1="256" y1="200" x2="256" y2="420" stroke="#6af7b8" stroke-width="6" stroke-linecap="round"/>
+  </svg>`;
+  const iconUrl = 'data:image/svg+xml,' + encodeURIComponent(icon);
+  const manifest = {
+    name: 'Life Streams',
+    short_name: 'Streams',
+    description: 'Track your life domains with 3D checkers',
+    start_url: './',
+    display: 'standalone',
+    orientation: 'portrait',
+    background_color: '#0a0a12',
+    theme_color: '#0a0a12',
+    icons: [
+      { src: iconUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+      { src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
+  const url  = URL.createObjectURL(blob);
+  const link = document.createElement('link');
+  link.rel = 'manifest'; link.href = url;
+  document.head.appendChild(link);
+})();
+</script>
+<!-- System fonts: SF Pro on Apple, Segoe UI on Windows, Roboto on Android -->
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+/* ══ THEMES ══ */
+:root {
+  --bg:#0a0a12; --surface:#12121e; --border:rgba(255,255,255,0.07);
+  --text:#e8e8f0; --muted:#5a5a7a; --accent:#7c6af7; --accent2:#f7c06a;
+  --card-bg:rgba(14,14,24,0.97); --card-border:rgba(255,255,255,0.07);
+  --header-h:68px;
+  --font-ui:   -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-mono: ui-monospace,'SF Mono',SFMono-Regular,Menlo,'Courier New',monospace;
+}
+body.light {
+  --bg:#f0f0f8; --surface:#ffffff; --border:rgba(0,0,0,0.08);
+  --text:#1a1a2e; --muted:#8888aa; --accent:#6a56e8; --accent2:#d4960a;
+  --card-bg:rgba(255,255,255,0.97); --card-border:rgba(0,0,0,0.08);
+}
+#canvas { background:#0a0a12; }
+body.light { background:#e8e8f4 !important; }
+body.light #canvas { background:#e8e8f4; }
+html, body { width:100%; height:100%; overflow:hidden; background:#0a0a12; font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; color:var(--text); touch-action:none; }
+
+#canvas {
+  position:fixed;
+  top:0; left:0; right:0; bottom:0;
+  width:100%; display:block;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+/* ══ HUD ══ */
+#hud { position:fixed; inset:0; pointer-events:none; z-index:100; }
+#header {
+  position:absolute; top:16px; left:16px; right:16px;
+  height:56px;
+  padding:0 12px 0 8px;
+  display:flex; align-items:center; justify-content:space-between;
+  pointer-events:all;
+  background:rgba(18,18,30,0.55);
+  backdrop-filter:blur(24px) saturate(1.6);
+  -webkit-backdrop-filter:blur(24px) saturate(1.6);
+  border:1px solid rgba(255,255,255,0.10);
+  border-radius:28px;
+  box-shadow:0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+body.light #header {
+  background:rgba(255,255,255,0.45);
+  border-color:rgba(0,0,0,0.08);
+  box-shadow:0 4px 24px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.7);
+}
+body.light { --hamburger-line: rgba(0,0,0,0.7); }
+body.light #hamburger-btn { background:rgba(0,0,0,0.06) !important; border-color:rgba(0,0,0,0.1) !important; }
+#app-title { font-size:22px; font-weight:800; letter-spacing:-0.02em; background:linear-gradient(135deg,#fff 0%,var(--accent) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; line-height:1; }
+body.light #app-title { background:linear-gradient(135deg,#1a1a2e 0%,var(--accent) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+#app-subtitle { font-size:10px; color:var(--muted); letter-spacing:0.1em; text-transform:uppercase; margin-top:2px; }
+body.light #app-subtitle { color:rgba(0,0,0,0.45); }
+#stats-pill { background:rgba(124,106,247,0.12); border:1px solid rgba(124,106,247,0.25); border-radius:20px; padding:6px 14px; font-size:11px; font-family:'SF Mono', SFMono-Regular, ui-monospace, 'Fira Code', 'Cascadia Code', Consolas, monospace; color:var(--accent); text-align:right; cursor:pointer; flex-shrink:0; }
+
+/* Camera controls — right side */
+#cam-controls {
+  position:absolute; right:14px; top:50%; transform:translateY(-50%);
+  display:flex; flex-direction:column; gap:10px; pointer-events:all;
+}
+.cam-btn {
+  width:42px; height:42px; border-radius:50%;
+  background:rgba(18,18,30,0.93); border:1px solid rgba(255,255,255,0.12);
+  color:#e8e8f0; font-size:22px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; backdrop-filter:blur(20px);
+  transition:background 0.15s, transform 0.1s; line-height:1;
+  /* always dark bg so +/− are readable in both themes */
+}
+.cam-btn:active { transform:scale(0.88); background:rgba(124,106,247,0.35); }
+#home-btn { font-size:17px; border-color:rgba(124,106,247,0.5); color:#a89af7; }
+/* light mode: slightly lighter dark pill so it contrasts with light bg */
+body.light .cam-btn { background:rgba(30,28,60,0.88); border-color:rgba(124,106,247,0.35); }
+
+/* ══ BOTTOM DOCK — two big buttons ══ */
+#bottom-bar {
+  position:fixed; left:16px; right:16px; bottom:16px; z-index:200;
+  padding:5px;
+  display:flex; gap:6px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.18);
+  border-radius:26px;
+  backdrop-filter:blur(40px);
+  -webkit-backdrop-filter:blur(40px);
+  pointer-events:all;
+}
+.dock-btn {
+  flex:1; padding:14px 10px; border-radius:20px;
+  border:none;
+  background:transparent;
+  color:#e8e6ff;
+  font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; font-size:14px; font-weight:800;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:transform 0.15s;
+  letter-spacing:0.01em;
+}
+body.light #bottom-bar {
+  border-color:rgba(0,0,0,0.1);
+}
+body.light .dock-btn {
+  background:transparent;
+  color:#3a3a5c;
+}
+body.light #btn-new-stream { background:rgba(124,106,247,0.15); color:var(--accent); border-color:rgba(124,106,247,0.3); }
+body.light #btn-fit-all { background:rgba(255,255,255,0.7); color:var(--accent); }
+.dock-btn:active { transform:scale(0.96); filter:brightness(1.1); }
+#btn-new-stream {
+  background:rgba(124,106,247,0.2); color:#e8e6ff;
+  flex:3;
+  border-radius:20px;
+}
+#btn-fit-all {
+  flex:1;
+  background:rgba(124,106,247,0.15);
+  border:1px solid rgba(124,106,247,0.3);
+  color:var(--accent);
+  font-size:20px;
+}
+body.light #btn-fit-all { background:rgba(124,106,247,0.1); border-color:rgba(124,106,247,0.25); }
+
+
+/* ══ HOURS SHEET ══ */
+#hours-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:500; opacity:0; pointer-events:none; transition:opacity 0.3s; }
+#hours-overlay.open { opacity:1; pointer-events:all; }
+#hours-sheet {
+  position:fixed; bottom:0; left:0; right:0;
+  background:rgba(20,18,35,0.85);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);border:1px solid rgba(255,255,255,0.10); border-top:1px solid var(--border);
+  border-radius:24px 24px 0 0; padding:20px 16px 36px;
+  z-index:501; transform:translateY(100%);
+  transition:transform 0.38s cubic-bezier(0.34,1.2,0.64,1);
+  max-height:72vh; display:flex; flex-direction:column;
+}
+#hours-sheet.open { transform:translateY(0); }
+#hours-sheet-title {
+  font-size:13px; font-weight:700; color:var(--muted);
+  letter-spacing:0.08em; text-transform:uppercase;
+  margin-bottom:14px; text-align:center;
+}
+#hours-list {
+  flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px;
+  -webkit-overflow-scrolling:touch;
+}
+
+/* Stream row inside hours sheet */
+.hrow {
+  display:flex; align-items:center; gap:12px;
+  background:var(--card-bg); border:1px solid var(--card-border);
+  border-radius:14px; padding:11px 14px;
+  user-select:none; -webkit-user-select:none;
+  transition:border-color 0.2s, background 0.2s;
+  flex-shrink:0;
+}
+.hrow.pressing { border-color:rgba(255,60,60,0.5); background:rgba(255,30,30,0.07); }
+.hrow-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+.hrow-info { flex:1; min-width:0; }
+.hrow-name { font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hrow-hours { font-size:11px; font-family:'SF Mono', SFMono-Regular, ui-monospace, 'Fira Code', 'Cascadia Code', Consolas, monospace; color:var(--muted); margin-top:2px; }
+.hrow-actions { display:flex; gap:7px; flex-shrink:0; align-items:center; }
+.hrow-add {
+  width:40px; height:40px; border-radius:50%; border:none;
+  font-size:24px; font-weight:700; cursor:pointer; color:#fff;
+  display:flex; align-items:center; justify-content:center; line-height:1;
+  transition:transform 0.12s, filter 0.12s; flex-shrink:0;
+}
+.hrow-add:active { transform:scale(0.83); filter:brightness(1.3); }
+.hrow-undo {
+  width:34px; height:34px; border-radius:50%;
+  border:1px solid rgba(247,192,106,0.35); background:rgba(247,192,106,0.07);
+  font-size:14px; cursor:pointer; color:var(--accent2);
+  display:flex; align-items:center; justify-content:center;
+  transition:transform 0.12s; flex-shrink:0;
+}
+.hrow-undo:active { transform:scale(0.83); }
+.hrow-undo:disabled { opacity:0.2; cursor:not-allowed; }
+
+#hours-sheet-close {
+  width:100%; padding:13px; margin-top:12px; border-radius:14px;
+  border:none; background:rgba(255,255,255,0.06); color:var(--muted);
+  font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; font-size:14px; font-weight:700;
+  cursor:pointer; flex-shrink:0;
+  transition:background 0.15s;
+}
+#hours-sheet-close:active { background:rgba(255,255,255,0.12); }
+
+/* keep old styles for sheets/modals */
+.stream-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.stream-info { flex:1; min-width:0; }
+.stream-name { font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stream-meta { font-size:10px; font-family:'SF Mono', SFMono-Regular, ui-monospace, 'Fira Code', 'Cascadia Code', Consolas, monospace; color:var(--muted); margin-top:1px; }
+
+
+#undo-toast { user-select:none; pointer-events:none; position:fixed; left:50%; bottom:160px; transform:translateX(-50%) translateY(16px); background:rgba(14,14,24,0.97); border:1px solid rgba(247,192,106,0.35); border-radius:24px; padding:10px 16px; display:flex; align-items:center; gap:12px; font-size:12px; font-weight:700; color:var(--accent2); pointer-events:all; z-index:400; opacity:0; transition:opacity 0.3s,transform 0.3s; white-space:nowrap; backdrop-filter:blur(20px); }
+#undo-toast.show { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:all; }
+#undo-btn { border:none; background:var(--accent2); color:#000; border-radius:12px; padding:4px 12px; font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; font-weight:800; font-size:11px; cursor:pointer; }
+
+#del-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:500; opacity:0; pointer-events:none; transition:opacity 0.3s; }
+#del-overlay.open { opacity:1; pointer-events:all; }
+#del-sheet { position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--border); border-radius:24px 24px 0 0; padding:24px 20px 44px; z-index:501; transform:translateY(100%); transition:transform 0.35s cubic-bezier(0.34,1.2,0.64,1); }
+#del-sheet.open { transform:translateY(0); }
+#del-name { font-size:19px; font-weight:800; margin-bottom:4px; }
+#del-meta { font-size:12px; color:var(--muted); margin-bottom:24px; font-family:'SF Mono', SFMono-Regular, ui-monospace, 'Fira Code', 'Cascadia Code', Consolas, monospace; }
+.sbt { width:100%; padding:16px; border-radius:14px; border:none; font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; font-size:15px; font-weight:700; cursor:pointer; margin-bottom:10px; }
+.sbt:active { filter:brightness(0.85); }
+.sbt-del { background:#ff3b3b; color:#fff; }
+.sbt-cancel { background:rgba(255,255,255,0.07); color:var(--muted); }
+
+#modal-overlay { position:fixed; inset:0; background:rgba(10,10,18,0.85); backdrop-filter:blur(12px); z-index:600; display:flex; align-items:center; justify-content:center; padding:24px; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+#modal-overlay.open { opacity:1; pointer-events:all; }
+#modal { background:rgba(24,22,42,0.88);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);border:1px solid rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.1); border-radius:24px; padding:28px 24px; width:100%; max-width:380px; transform:translateY(20px); transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+#modal-overlay.open #modal { transform:translateY(0); }
+#modal h2 { font-size:20px; font-weight:800; margin-bottom:20px; background:linear-gradient(135deg,#fff 0%,var(--accent) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+body.light #modal-overlay { background:rgba(180,175,210,0.55); }
+body.light #modal { background:rgba(255,255,255,0.92); border-color:rgba(0,0,0,0.08); }
+body.light #modal input { background:rgba(0,0,0,0.05); color:#1a1a2e; border-color:rgba(0,0,0,0.12); }
+body.light #modal input::placeholder { color:rgba(0,0,0,0.35); }
+body.light #modal h2 { background:linear-gradient(135deg,#1a1a2e 0%,var(--accent) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+#modal input { width:100%; padding:14px 16px; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,0.04); color:var(--text); font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; font-size:16px; font-weight:600; outline:none; transition:border-color 0.2s; margin-bottom:16px; }
+#modal input:focus { border-color:var(--accent); }
+#modal input::placeholder { color:var(--muted); font-weight:400; }
+.cpicker { display:flex; gap:10px; flex-wrap:nowrap; overflow-x:auto; margin-bottom:20px; padding-bottom:6px; scrollbar-width:none; -ms-overflow-style:none; }
+.cpicker::-webkit-scrollbar { display:none; }
+.cswatch { width:36px; height:36px; border-radius:50%; cursor:pointer; border:3px solid transparent; transition:transform 0.15s,border-color 0.15s; }
+.cswatch.sel { border-color:#fff; transform:scale(1.15); }
+.macts { display:flex; gap:10px; }
+.mbtn { flex:1; padding:14px; border-radius:12px; border:none; font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; font-size:14px; font-weight:700; cursor:pointer; }
+.mbtn:active { filter:brightness(0.9); }
+.mbtn-c { background:rgba(255,255,255,0.07); color:var(--muted); }
+.mbtn-ok { background:var(--accent); color:#fff; }
+
+#chart-panel { position:fixed; left:16px; right:16px; bottom:90px; max-height:70vh; background:rgba(20,18,35,0.82); box-shadow:0 16px 60px rgba(0,0,0,0.6), 0 4px 20px rgba(0,0,0,0.4); backdrop-filter:blur(40px) saturate(2); -webkit-backdrop-filter:blur(40px) saturate(2); border:1px solid rgba(255,255,255,0.10); border-radius:24px; z-index:700; display:flex; flex-direction:column; padding:24px 20px 28px; transform:translateY(calc(100% + 120px)); transition:transform 0.4s cubic-bezier(0.34,1.2,0.64,1); box-shadow:0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08); overflow:hidden; }
+body.light #chart-panel { background:rgba(255,255,255,0.75); border-color:rgba(0,0,0,0.07); box-shadow:0 8px 40px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.9); }
+#chart-panel.open { transform:translateY(0); }
+.chart-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+.chart-hdr h2 { font-size:20px; font-weight:800; color:var(--text); }
+#close-chart { width:36px; height:36px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.08); color:var(--text); font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.cbars { flex:1; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
+.crow { display:flex; align-items:center; gap:10px; }
+.crow-lbl { font-size:11px; font-weight:700; width:110px; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.crow-track { flex:1; height:28px; background:rgba(255,255,255,0.04); border-radius:6px; overflow:hidden; }
+.crow-fill { height:100%; border-radius:6px; display:flex; align-items:center; padding-left:10px; font-size:11px; font-family:'SF Mono', SFMono-Regular, ui-monospace, 'Fira Code', 'Cascadia Code', Consolas, monospace; font-weight:500; color:rgba(255,255,255,0.9); transition:width 0.8s cubic-bezier(0.34,1.2,0.64,1); min-width:40px; white-space:nowrap; }
+
+/* EDIT COLOR SHEET */
+#edit-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;opacity:0;pointer-events:none;transition:opacity 0.3s; }
+#edit-overlay.open { opacity:1;pointer-events:all; }
+#edit-sheet { position:fixed;bottom:0;left:0;right:0;background:rgba(20,18,35,0.97);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);border:1px solid rgba(255,255,255,0.10);border-top:1px solid rgba(255,255,255,0.12);border-radius:24px 24px 0 0;padding:24px 20px 48px;z-index:502;transform:translateY(100%);transition:transform 0.32s cubic-bezier(0.32,0.72,0,1);box-shadow:0 -4px 32px rgba(0,0,0,0.4); }
+body.light #edit-sheet { background:rgba(245,244,255,0.98);border-color:rgba(0,0,0,0.08); }
+#edit-sheet.open { transform:translateY(0); }
+.edit-swatch { width:44px;height:44px;min-width:44px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:transform 0.15s,border-color 0.15s; }
+.edit-swatch.sel { border-color:#fff;transform:scale(1.15); }
+
+
+/* SETTINGS */
+#settings-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;opacity:0;pointer-events:none;transition:opacity 0.3s; }
+#settings-overlay.open { opacity:1;pointer-events:all; }
+#settings-sheet {
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--surface);border-top:1px solid var(--border);
+  border-radius:24px 24px 0 0;padding:24px 20px 48px;
+  z-index:501;transform:translateY(100%);
+  transition:transform 0.38s cubic-bezier(0.34,1.2,0.64,1);
+}
+#settings-sheet.open { transform:translateY(0); }
+#settings-title { font-size:18px;font-weight:800;margin-bottom:24px; }
+.settings-section { margin-bottom:24px; }
+.settings-label { font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.09em;text-transform:uppercase;margin-bottom:10px; }
+.lang-options { display:flex;gap:10px; }
+.lang-btn {
+  flex:1;padding:13px 8px;border-radius:14px;border:1px solid var(--border);
+  background:transparent;color:var(--text);font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;transition:background 0.2s,border-color 0.2s;
+}
+.lang-btn.active { background:var(--accent);color:#fff;border-color:var(--accent); }
+.lang-btn:active { filter:brightness(0.9); }
+.theme-row {
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--card-bg);border:1px solid var(--card-border);
+  border-radius:14px;padding:14px 16px;
+  font-size:14px;font-weight:600;
+}
+/* Toggle switch */
+.toggle-btn {
+  width:48px;height:28px;border-radius:14px;border:none;cursor:pointer;
+  background:var(--muted);position:relative;transition:background 0.2s;padding:0;flex-shrink:0;
+}
+.toggle-btn.on { background:var(--accent); }
+.toggle-knob {
+  position:absolute;top:3px;left:3px;
+  width:22px;height:22px;border-radius:50%;
+  background:#fff;transition:transform 0.2s;
+  display:block;
+}
+.toggle-btn.on .toggle-knob { transform:translateX(20px); }
+.settings-close {
+  width:100%;padding:15px;border-radius:16px;border:none;
+  background:var(--accent);color:#fff;
+  font-family:-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;font-size:15px;font-weight:800;cursor:pointer;
+}
+.settings-close:active { filter:brightness(0.9); }
+
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:2px; }
+</style>
+
+<style id="dstream-extra-css">
+/* ── Liquid glass panel ── */
+#side-overlay {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 800;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.36s cubic-bezier(0.32,0.72,0,1);
+}
+#side-panel {
+  display: flex;
+  position: fixed;
+  top: 12px; left: 12px;
+  width: 78vw; max-width: 290px;
+  height: calc(100dvh - 24px);
+  background: rgba(20,18,35,0.72);
+  backdrop-filter: blur(40px) saturate(2);
+  -webkit-backdrop-filter: blur(40px) saturate(2);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 24px;
+  z-index: 801;
+  flex-direction: column;
+  transform: translateX(calc(-100% - 20px));
+  transition: transform 0.36s cubic-bezier(0.32,0.72,0,1);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+  overflow: hidden;
+  visibility: hidden;
+}
+body.light #side-panel {
+  background: rgba(255,255,255,0.65);
+  border-color: rgba(0,0,0,0.07);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+.sp-section-label {
+  padding: 16px 20px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.4);
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+body.light .sp-section-label { color: rgba(0,0,0,0.35); }
+body.light .sp-title { color: #1a1a2e !important; }
+body.light #side-panel .sp-title, body.light [class*="sp-tit"] { color: #1a1a2e !important; }
+body.light #sp-status { color: rgba(0,0,0,0.75) !important; }
+#sp-status { font-size:16px; font-weight:800; color:#e8e6ff; }
+#sp-status-sub { font-size:11px; color:rgba(255,255,255,0.4); margin-top:2px; }
+body.light #sp-status-sub { color:rgba(0,0,0,0.4) !important; }
+.sp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 20px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 0;
+}
+.sp-row:active { background: rgba(255,255,255,0.06); }
+body.light .sp-row:active { background: rgba(0,0,0,0.06); }
+.sp-row-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sp-row-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+body.light .sp-row-label { color: rgba(0,0,0,0.85); }
+.sp-toggle {
+  width: 42px; height: 24px;
+  border-radius: 12px;
+  background: #7c6af7;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.sp-toggle.off { background: rgba(255,255,255,0.15); }
+body.light .sp-toggle.off { background: rgba(0,0,0,0.15); }
+.sp-toggle-dot {
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 18px; height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: right 0.2s;
+}
+.sp-toggle.off .sp-toggle-dot { right: 21px; }
+.sp-lang-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 20px 14px 52px;
+}
+.sp-lang-btn {
+  padding: 6px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  font-family: monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+body.light .sp-lang-btn { border-color: rgba(0,0,0,0.15); color: rgba(0,0,0,0.4); }
+.sp-lang-btn.active {
+  background: rgba(124,106,247,0.25);
+  border-color: #7c6af7;
+  color: #fff;
+}
+body.light .sp-lang-btn.active { color: #3a2fa0; }
+.sp-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 8px 0;
+}
+body.light .sp-divider { background: rgba(0,0,0,0.06); }
+.sp-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg,#7c6af7,#f7c06a);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 700;
+  color: #fff; font-family: Syne,sans-serif;
+  overflow: hidden; flex-shrink: 0;
+}
+.sp-avatar img { width:100%;height:100%;object-fit:cover; }
+.sp-btn {
+  width: calc(100% - 32px);
+  margin: 6px 16px;
+  padding: 13px;
+  border-radius: 14px;
+  font-family: Syne, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.sp-btn:active { opacity: 0.85; transform: scale(0.97); }
+.sp-btn-google {
+  background: #fff;
+  color: #1a1a2e;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.sp-btn-signout {
+  background: rgba(255,80,80,0.1);
+  border: 1px solid rgba(255,80,80,0.3) !important;
+  color: rgba(255,100,100,1);
+}
+.sp-btn-delete {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  color: rgba(255,255,255,0.25);
+  font-size: 12px;
+}
+body.light .sp-btn-delete { border-color: rgba(0,0,0,0.08) !important; color: rgba(0,0,0,0.3); }
+
+/* ── Profile sub-panel ── */
+#sp-profile-panel {
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: rgba(20,18,35,0.98);
+  backdrop-filter: blur(40px) saturate(2);
+  -webkit-backdrop-filter: blur(40px) saturate(2);
+  display: flex; flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.32s cubic-bezier(0.32,0.72,0,1);
+  z-index: 10;
+  overflow: hidden;
+}
+body.light #sp-profile-panel {
+  background: rgba(245,244,255,0.98);
+}
+#sp-profile-panel.open { transform: translateX(0); }
+#sp-profile-panel-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 52px 20px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+body.light #sp-profile-panel-header { border-color: rgba(0,0,0,0.07); }
+#sp-back-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+  font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+body.light #sp-back-btn { border-color:rgba(0,0,0,0.1); background:rgba(0,0,0,0.04); color:rgba(0,0,0,0.6); }
+#sp-back-btn:active { opacity: 0.7; }
+.sp-profile-name {
+  font-size: 16px; font-weight: 800; color: #e8e6ff;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+body.light .sp-profile-name { color: #1a1a2e; }
+.sp-profile-email {
+  font-size: 11px; color: rgba(255,255,255,0.4);
+  font-family: monospace; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+body.light .sp-profile-email { color: rgba(0,0,0,0.4); }
+#sp-profile-avatar-large {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(135deg,#7c6af7,#f7c06a);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700; color: #fff;
+  overflow: hidden; flex-shrink: 0;
+}
+#sp-profile-avatar-large img { width:100%;height:100%;object-fit:cover; }
+.sp-profile-actions { padding: 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+.sp-profile-action-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-radius: 14px;
+  cursor: pointer; transition: background 0.15s;
+  border: 1px solid transparent;
+}
+.sp-profile-action-row:active { opacity: 0.8; transform: scale(0.98); }
+.sp-profile-action-row.danger {
+  background: rgba(255,59,48,0.08);
+  border-color: rgba(255,59,48,0.2);
+}
+.sp-profile-action-row.signout {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+}
+body.light .sp-profile-action-row.signout {
+  background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08);
+}
+.sp-profile-action-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+.sp-profile-action-row.signout .sp-profile-action-icon { background: rgba(255,255,255,0.08); }
+.sp-profile-action-row.danger .sp-profile-action-icon { background: rgba(255,59,48,0.15); }
+body.light .sp-profile-action-row.signout .sp-profile-action-icon { background: rgba(0,0,0,0.06); }
+.sp-profile-action-label {
+  font-size: 14px; font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.sp-profile-action-row.signout .sp-profile-action-label { color: rgba(255,255,255,0.85); }
+.sp-profile-action-row.danger .sp-profile-action-label { color: #ff6060; }
+body.light .sp-profile-action-row.signout .sp-profile-action-label { color: rgba(0,0,0,0.8); }
+#sp-profile-sync {
+  margin: 0 16px 4px;
+  font-size: 11px; color: rgba(124,106,247,0.8);
+  font-family: monospace; padding: 7px 12px;
+  background: rgba(124,106,247,0.1); border-radius: 8px;
+}
+#sp-header { cursor: pointer; }
+#sp-header:active { opacity: 0.85; }
+.sp-map-row {
+  display: flex; align-items: center;
+  margin: 3px 12px; padding: 11px 14px;
+  border-radius: 12px; cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s;
+  gap: 10px;
+}
+.sp-map-row.active {
+  background: rgba(124,106,247,0.15);
+  border-color: rgba(124,106,247,0.3);
+}
+.sp-map-row:not(.active):active { background: rgba(255,255,255,0.06); }
+body.light .sp-map-row.active { background: rgba(124,106,247,0.12); }
+.sp-map-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); flex-shrink: 0; opacity: 0.5;
+}
+.sp-map-row.active .sp-map-dot { opacity: 1; }
+.sp-map-name {
+  flex: 1; font-size: 14px; font-weight: 600;
+  color: rgba(255,255,255,0.75);
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+body.light .sp-map-name { color: rgba(0,0,0,0.7); }
+.sp-map-row.active .sp-map-name { color: var(--accent); font-weight: 700; }
+.sp-map-more {
+  width: 28px; height: 28px; border-radius: 8px;
+  border: none; background: transparent;
+  color: rgba(255,255,255,0.3); font-size: 16px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+body.light .sp-map-more { color: rgba(0,0,0,0.3); }
+.sp-map-more:active { background: rgba(255,255,255,0.1); }
+
+/* ── Onboarding ── */
+#onboard {
+  position: fixed; inset: 0;
+  z-index: 9999;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: obIn 0.45s cubic-bezier(0.32,0.72,0,1);
+}
+#onboard.dark-ob { background: #07070f; }
+#onboard.light-ob { background: #f4f3ff; }
+@keyframes obIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+#onboard.out { animation: obOut 0.38s cubic-bezier(0.32,0.72,0,1) forwards; }
+@keyframes obOut { to{opacity:0;transform:translateY(-12px)} }
+#ob-slides-track { display:flex; flex:1; transition:transform 0.42s cubic-bezier(0.32,0.72,0,1); }
+.ob-slide { flex:0 0 100%; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 36px; text-align:center; }
+.ob-visual { width:160px; height:160px; border-radius:40px; display:flex; align-items:center; justify-content:center; margin-bottom:40px; flex-shrink:0; }
+#onboard.dark-ob .ob-visual { background:rgba(124,106,247,0.12); border:1px solid rgba(124,106,247,0.2); }
+#onboard.light-ob .ob-visual { background:rgba(124,106,247,0.08); border:1px solid rgba(124,106,247,0.15); }
+.ob-step-title { font-size:28px; font-weight:800; letter-spacing:-0.5px; font-family:-apple-system,BlinkMacSystemFont,sans-serif; line-height:1.2; margin-bottom:14px; }
+#onboard.dark-ob .ob-step-title { color:#e8e6ff; }
+#onboard.light-ob .ob-step-title { color:#1a1a2e; }
+.ob-step-desc { font-size:15px; line-height:1.65; font-family:-apple-system,BlinkMacSystemFont,sans-serif; max-width:280px; }
+#onboard.dark-ob .ob-step-desc { color:rgba(255,255,255,0.45); }
+#onboard.light-ob .ob-step-desc { color:rgba(0,0,0,0.45); }
+#ob-dots { display:flex; gap:7px; justify-content:center; margin-bottom:28px; }
+.ob-dot { width:6px; height:6px; border-radius:50%; transition:all 0.25s; }
+#onboard.dark-ob .ob-dot { background:rgba(255,255,255,0.15); }
+#onboard.light-ob .ob-dot { background:rgba(0,0,0,0.12); }
+.ob-dot.active { width:20px; border-radius:3px; background:#7c6af7 !important; }
+#ob-bottom { padding:0 24px 52px; display:flex; flex-direction:column; gap:10px; }
+#ob-primary-btn { width:100%; padding:16px; border-radius:16px; border:none; background:#7c6af7; color:#fff; font-family:-apple-system,BlinkMacSystemFont,sans-serif; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:opacity 0.15s,transform 0.15s; }
+#ob-primary-btn:active { opacity:0.85; transform:scale(0.98); }
+#ob-secondary-btn { width:100%; padding:14px; border-radius:16px; border:none; background:transparent; cursor:pointer; font-family:-apple-system,BlinkMacSystemFont,sans-serif; font-size:14px; font-weight:600; }
+#onboard.dark-ob #ob-secondary-btn { color:rgba(255,255,255,0.4); }
+#onboard.light-ob #ob-secondary-btn { color:rgba(0,0,0,0.35); }
+#ob-topbar { display:flex; align-items:center; justify-content:space-between; padding:52px 24px 0; flex-shrink:0; }
+#ob-skip-btn { border:none; background:transparent; cursor:pointer; font-size:14px; font-weight:600; font-family:-apple-system,BlinkMacSystemFont,sans-serif; padding:8px 4px; }
+#onboard.dark-ob #ob-skip-btn { color:rgba(255,255,255,0.3); }
+#onboard.light-ob #ob-skip-btn { color:rgba(0,0,0,0.3); }
+#ob-lang-row { display:flex; gap:6px; }
+.ob-lang { padding:5px 14px; border-radius:20px; border:1px solid rgba(124,106,247,0.3); background:transparent; cursor:pointer; font-family:monospace; font-size:12px; transition:all 0.15s; }
+#onboard.dark-ob .ob-lang { color:rgba(255,255,255,0.4); }
+#onboard.light-ob .ob-lang { color:rgba(0,0,0,0.4); }
+.ob-lang.active { background:rgba(124,106,247,0.2); border-color:#7c6af7; color:#7c6af7 !important; }
+
+/* ══════════════════════════════════════════════
+   DESKTOP / MOUSE LAYER
+   Only applies on non-touch devices ≥ 768px
+   Mobile CSS is completely untouched
+══════════════════════════════════════════════ */
+@media (pointer: fine) and (min-width: 768px) {
+
+  /* ── Slightly lighter bg so it's not pure void ── */
+  html, body { background: #0d0d1a !important; }
+  #canvas { background: #0d0d1a !important; }
+  body.light, body.light #canvas { background: #ededf7 !important; }
+
+  /* ── Header: wider, more padding, centered content ── */
+  #header {
+    top: 20px; left: 24px; right: 24px;
+    height: 60px;
+    padding: 0 20px;
+    border-radius: 32px;
+  }
+
+  /* ── Side panel: wider on desktop ── */
+  #side-panel {
+    width: 300px;
+    max-width: 300px;
+    top: 16px; left: 16px;
+    height: calc(100dvh - 32px);
+    border-radius: 28px;
+  }
+
+  /* ── Bottom bar: narrower, centered, floating ── */
+  #bottom-bar {
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    min-width: 340px;
+    max-width: 480px;
+    bottom: 24px;
+    padding: 6px;
+    border-radius: 32px;
+  }
+
+  .dock-btn {
+    padding: 14px 28px;
+    font-size: 14px;
+    border-radius: 24px;
+  }
+
+  .dock-btn:hover {
+    background: rgba(255,255,255,0.07) !important;
+    filter: brightness(1.15);
+  }
+  body.light .dock-btn:hover { background: rgba(0,0,0,0.05) !important; }
+
+  #btn-new-stream:hover {
+    background: rgba(124,106,247,0.3) !important;
+  }
+  #btn-fit-all:hover {
+    background: rgba(124,106,247,0.25) !important;
+  }
+
+  /* ── Camera buttons: hover states ── */
+  .cam-btn:hover {
+    background: rgba(124,106,247,0.25) !important;
+    border-color: rgba(124,106,247,0.5) !important;
+    transform: scale(1.08);
+  }
+
+  /* ── Hamburger hover ── */
+  #hamburger-btn:hover {
+    background: rgba(255,255,255,0.16) !important;
+    border-color: rgba(255,255,255,0.2) !important;
+  }
+  body.light #hamburger-btn:hover {
+    background: rgba(0,0,0,0.1) !important;
+  }
+
+  /* ── Hours sheet: centered card instead of bottom sheet ── */
+  #hours-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+  #hours-sheet {
+    position: relative;
+    bottom: auto; left: auto; right: auto;
+    width: 420px;
+    max-width: 100%;
+    max-height: 75vh;
+    border-radius: 24px;
+    transform: translateY(20px) scale(0.97);
+    transition: transform 0.32s cubic-bezier(0.34,1.2,0.64,1), opacity 0.25s;
+    opacity: 0;
+    padding: 28px 24px 28px;
+  }
+  #hours-sheet.open {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  #hours-overlay.open { background: rgba(0,0,0,0.5); }
+
+  /* ── hrow hover ── */
+  .hrow:hover {
+    border-color: rgba(124,106,247,0.3);
+    background: rgba(124,106,247,0.06);
+  }
+  .hrow-add:hover { filter: brightness(1.2); transform: scale(1.08); }
+  .hrow-undo:hover { background: rgba(247,192,106,0.15); }
+
+  /* ── Modal: already centered, just polish ── */
+  #modal {
+    border-radius: 24px;
+    padding: 32px;
+    min-width: 380px;
+  }
+  .mbtn:hover { filter: brightness(1.1); }
+  .mbtn-ok:hover { box-shadow: 0 0 20px rgba(124,106,247,0.4); }
+
+  /* ── Delete / edit sheets → centered cards ── */
+  #del-overlay, #edit-overlay, #settings-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+  #del-sheet, #edit-sheet, #settings-sheet {
+    position: relative;
+    bottom: auto; left: auto; right: auto;
+    width: 380px;
+    max-width: 100%;
+    border-radius: 24px;
+    transform: translateY(20px) scale(0.97);
+    opacity: 0;
+    transition: transform 0.32s cubic-bezier(0.34,1.2,0.64,1), opacity 0.25s;
+  }
+  #del-sheet.open, #edit-sheet.open, #settings-sheet.open {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+
+  /* ── Chart panel: wider, more padding ── */
+  #chart-panel {
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    width: 520px;
+    max-width: calc(100vw - 48px);
+    bottom: 100px;
+    border-radius: 24px;
+    padding: 28px;
+    opacity: 0;
+    transition: transform 0.35s cubic-bezier(0.34,1.2,0.64,1), opacity 0.25s;
+  }
+  #chart-panel.open {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  #close-chart:hover { background: rgba(255,255,255,0.15); }
+
+  /* ── Side panel rows hover ── */
+  .sp-row:hover { background: rgba(255,255,255,0.05); }
+  body.light .sp-row:hover { background: rgba(0,0,0,0.04); }
+  .sp-map-row:hover { background: rgba(124,106,247,0.08); }
+  .sp-btn:hover { opacity: 0.85; }
+  .sp-btn-google:hover { background: #f0f0f0 !important; }
+  .sp-profile-action-row:hover { opacity: 0.85; }
+
+  /* ── Scrollbars: slightly more visible on desktop ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+  body.light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
+
+  /* ── Map options sheet → centered card ── */
+  #map-options-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+}
+</style>
+
+</head>
+<body>
+
+<!-- Side panel overlay -->
+<div id="side-overlay" onclick="closeSidePanel()"></div>
+
+<!-- Side panel -->
+<div id="side-panel">
+
+  <!-- Profile sub-panel -->
+<div id="sp-profile-panel">
+  <div id="sp-profile-panel-header">
+    <button id="sp-back-btn" onclick="closeProfilePanel()">‹</button>
+    <div id="sp-profile-avatar-large">
+      <img id="sp-profile-avatar-img" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      <span id="sp-profile-avatar-letter">?</span>
+    </div>
+    <div style="flex:1;min-width:0;">
+      <div class="sp-profile-name" id="sp-profile-name">—</div>
+      <div class="sp-profile-email" id="sp-profile-email"></div>
+    </div>
+  </div>
+  <div id="sp-profile-sync" style="display:none;margin:12px 16px 0;">Streams backed up</div>
+  <div class="sp-profile-actions">
+    <div class="sp-profile-action-row signout" onclick="closeProfilePanel();setTimeout(spSignOut,200);">
+      <div class="sp-profile-action-icon">↩</div>
+      <div class="sp-profile-action-label" id="sp-profile-signout-label">Sign Out</div>
+    </div>
+    <div class="sp-profile-action-row danger" onclick="closeProfilePanel();setTimeout(spDeleteAccount,200);">
+      <div class="sp-profile-action-icon">✕</div>
+      <div class="sp-profile-action-label" id="sp-profile-delete-label">Delete Account</div>
+    </div>
+  </div>
+</div>
+<!-- Profile header — transforms based on auth state -->
+  <div id="sp-header" style="padding:48px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.07);" onclick="spHeaderTap()">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="sp-avatar" id="sp-avatar" style="width:52px;height:52px;font-size:20px;flex-shrink:0;">
+        <img id="sp-avatar-img" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+        <span id="sp-avatar-letter">?</span>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div id="sp-status" style="font-size:16px;font-weight:700;color:#e8e6ff;font-family:-apple-system,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Not signed in</div>
+        <div id="sp-status-sub" style="margin-top:3px;font-size:12px;color:rgba(255,255,255,0.45);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+      </div>
+    </div>
+    <!-- Sync status — shown when signed in -->
+    <div id="sp-sync-status" style="display:none;margin-top:12px;font-size:11px;color:rgba(124,106,247,0.8);font-family:monospace;padding:7px 12px;background:rgba(124,106,247,0.1);border-radius:8px;"></div>
+  </div>
+
+  <!-- Scrollable content -->
+  <div style="flex:1;overflow-y:auto;padding-bottom:8px;">
+
+    <!-- SETTINGS section — right under profile -->
+    <div class="sp-section-label" id="sp-general-label">SETTINGS</div>
+
+    <!-- Theme -->
+    <div class="sp-row" onclick="spToggleTheme()">
+      <div class="sp-row-left">
+        <span id="sp-theme-icon" style="font-size:13px;opacity:0.7;font-family:monospace;">◑</span>
+        <span class="sp-row-label" id="sp-theme-label">Dark Mode</span>
+      </div>
+      <div class="sp-toggle" id="sp-theme-toggle">
+        <div class="sp-toggle-dot"></div>
+      </div>
+    </div>
+
+    <!-- Language -->
+    <div class="sp-row" style="cursor:default;">
+      <div class="sp-row-left">
+        <span style="font-size:15px;opacity:0.7;">⊕</span>
+        <span class="sp-row-label" id="sp-lang-label">Language</span>
+      </div>
+    </div>
+    <div class="sp-lang-row">
+      <button class="sp-lang-btn active" id="sp-en" onclick="spSetLang('en')">EN</button>
+      <button class="sp-lang-btn" id="sp-ru" onclick="spSetLang('ru')">RU</button>
+    </div>
+
+    <div class="sp-divider"></div>
+
+    <!-- MAPS section -->
+    <div class="sp-section-label">MAPS</div>
+
+    <!-- New Map button -->
+    <div class="sp-row" onclick="spNewMap()" style="margin:4px 12px 8px;border-radius:14px;background:rgba(124,106,247,0.12);border:1px solid rgba(124,106,247,0.25);">
+      <div class="sp-row-left">
+        <span style="font-size:18px;line-height:1;color:var(--accent);">＋</span>
+        <span class="sp-row-label" id="sp-new-map-label" style="color:var(--accent);font-weight:700;">New Map</span>
+      </div>
+    </div>
+
+    <!-- Maps list -->
+    <div id="sp-maps-list"></div>
+
+  </div>
+
+  <!-- Bottom: auth -->
+  <div style="padding:12px 0 32px;">
+    <!-- Signed out -->
+    <div id="sp-out">
+      <button class="sp-btn sp-btn-google" onclick="spSignIn()">
+        <svg width="16" height="16" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.098-1.796 2.742v2.279h2.908c1.702-1.567 2.684-3.875 2.684-6.611z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.279c-.806.54-1.836.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.353C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.69A5.413 5.413 0 0 1 3.682 9c0-.593.102-1.17.282-1.69V4.957H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.043l3.007-2.353z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.957L3.964 6.31C4.672 4.183 6.656 3.58 9 3.58z"/></svg>
+        <span id="sp-google-text">Sign in with Google</span>
+      </button>
+    </div>
+    <!-- Signed in -->
+    <!-- Signed in — actions in profile sub-panel -->
+    <div id="sp-in" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- Map options sheet -->
+<div id="map-options-overlay" onclick="closeMapOptions()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;opacity:0;pointer-events:none;transition:opacity 0.25s;"></div>
+<div id="map-options-sheet" style="position:fixed;bottom:0;left:0;right:0;background:rgba(20,18,35,0.97);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);border:1px solid rgba(255,255,255,0.1);border-radius:24px 24px 0 0;padding:0 16px 48px;z-index:901;transform:translateY(100%);transition:transform 0.32s cubic-bezier(0.32,0.72,0,1);">
+  <div style="width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,0.2);margin:12px auto 20px;"></div>
+  <div id="map-options-name" style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.4);font-family:monospace;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:16px;padding:0 4px;"></div>
+  <!-- Rename -->
+  <div id="map-rename-row" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+    <input id="map-rename-input" type="text" maxlength="32"
+      style="flex:1;padding:13px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:#e8e6ff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;font-weight:600;outline:none;"
+      placeholder="Map name"
+      onkeydown="if(event.key==='Enter')confirmRenameMap();">
+    <button onclick="confirmRenameMap()" style="padding:13px 18px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;">Save</button>
+  </div>
+  <!-- Delete -->
+  <button id="map-delete-btn" onclick="confirmDeleteMap()" style="width:100%;padding:14px;border-radius:14px;border:none;background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.25);color:#ff6060;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:700;cursor:pointer;">Delete Map</button>
+  <!-- Cancel -->
+  <button onclick="closeMapOptions()" style="width:100%;padding:14px;border-radius:14px;border:none;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;">Cancel</button>
+</div>
+
+<!-- Onboarding -->
+<div id="onboard">
+  <div id="ob-topbar">
+    <div id="ob-lang-row">
+      <button class="ob-lang active" id="ob-en" onclick="obSetLang('en')">EN</button>
+      <button class="ob-lang" id="ob-ru" onclick="obSetLang('ru')">RU</button>
+    </div>
+    <button id="ob-skip-btn" onclick="obSkipToSignIn()">Skip</button>
+  </div>
+  <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+    <div id="ob-slides-track">
+      <div class="ob-slide">
+        <div class="ob-visual">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="8" width="64" height="64" rx="12" fill="rgba(124,106,247,0.15)"/>
+            <line x1="26" y1="16" x2="26" y2="64" stroke="#7c6af7" stroke-width="1.5" stroke-opacity="0.4"/>
+            <line x1="40" y1="16" x2="40" y2="64" stroke="#7c6af7" stroke-width="1.5" stroke-opacity="0.4"/>
+            <line x1="54" y1="16" x2="54" y2="64" stroke="#7c6af7" stroke-width="1.5" stroke-opacity="0.4"/>
+            <circle cx="26" cy="58" r="8" fill="#ff6b6b"/>
+            <circle cx="40" cy="44" r="8" fill="#7c6af7"/>
+            <circle cx="54" cy="28" r="8" fill="#f7c06a"/>
+            <text x="26" y="62" text-anchor="middle" font-size="7" font-weight="800" fill="white" font-family="monospace">4</text>
+            <text x="40" y="48" text-anchor="middle" font-size="7" font-weight="800" fill="white" font-family="monospace">12</text>
+            <text x="54" y="32" text-anchor="middle" font-size="7" font-weight="800" fill="white" font-family="monospace">28</text>
+          </svg>
+        </div>
+        <div class="ob-step-title" id="ob-t1">Track what you invest time in</div>
+        <div class="ob-step-desc" id="ob-d1">Each area of your life gets a lane. Log hours and watch your checker move forward on the board.</div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-visual">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="40" cy="42" r="26" fill="rgba(124,106,247,0.15)"/>
+            <circle cx="40" cy="42" r="20" fill="#7c6af7"/>
+            <circle cx="40" cy="42" r="15" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" fill="none"/>
+            <text x="40" y="47" text-anchor="middle" font-size="14" font-weight="800" fill="white" font-family="monospace">47</text>
+            <circle cx="40" cy="12" r="9" fill="#7c6af7" fill-opacity="0.8"/>
+            <text x="40" y="17" text-anchor="middle" font-size="13" font-weight="700" fill="white" font-family="sans-serif">+</text>
+          </svg>
+        </div>
+        <div class="ob-step-title" id="ob-t2">One tap to log an hour</div>
+        <div class="ob-step-desc" id="ob-d2">Tap a checker to select it, then tap + to add an hour. The checker moves deeper as hours grow.</div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-visual">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="18" y="26" width="48" height="34" rx="8" fill="rgba(124,106,247,0.08)" stroke="rgba(124,106,247,0.25)" stroke-width="1.2"/>
+            <rect x="12" y="19" width="48" height="34" rx="8" fill="rgba(124,106,247,0.1)" stroke="rgba(124,106,247,0.3)" stroke-width="1.2"/>
+            <rect x="6" y="12" width="48" height="34" rx="8" fill="rgba(124,106,247,0.16)" stroke="rgba(124,106,247,0.5)" stroke-width="1.2"/>
+            <line x1="14" y1="22" x2="46" y2="22" stroke="#7c6af7" stroke-width="1" stroke-opacity="0.4"/>
+            <line x1="14" y1="28" x2="36" y2="28" stroke="#7c6af7" stroke-width="1" stroke-opacity="0.3"/>
+            <line x1="14" y1="34" x2="42" y2="34" stroke="#7c6af7" stroke-width="1" stroke-opacity="0.3"/>
+          </svg>
+        </div>
+        <div class="ob-step-title" id="ob-t3">Create separate maps</div>
+        <div class="ob-step-desc" id="ob-d3">Work, personal, health — keep different areas in separate maps. Switch between them instantly.</div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-visual">
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="40" cy="30" r="16" fill="rgba(124,106,247,0.15)" stroke="rgba(124,106,247,0.4)" stroke-width="1.5"/>
+            <circle cx="40" cy="30" r="8" fill="#7c6af7"/>
+            <path d="M16 66c0-13.3 10.7-20 24-20s24 6.7 24 20" stroke="#7c6af7" stroke-width="1.8" stroke-linecap="round" fill="none" stroke-opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="ob-step-title" id="ob-t4">Sync across devices</div>
+        <div class="ob-step-desc" id="ob-d4">Sign in with Google to back up your data and access it anywhere. Or start offline — sign in later.</div>
+      </div>
+    </div>
+  </div>
+  <div id="ob-dots">
+    <div class="ob-dot active" id="ob-dot-0"></div>
+    <div class="ob-dot" id="ob-dot-1"></div>
+    <div class="ob-dot" id="ob-dot-2"></div>
+    <div class="ob-dot" id="ob-dot-3"></div>
+  </div>
+  <div id="ob-bottom">
+    <button id="ob-primary-btn" onclick="obPrimaryTap()">
+      <span id="ob-primary-label">Next</span>
+    </button>
+    <button id="ob-secondary-btn" onclick="obSecondaryTap()">
+      <span id="ob-secondary-label">Continue as Guest</span>
+    </button>
+  </div>
+</div>
+  <div id="ob-icon">
+    <svg width="44" height="44" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+      <text x="4" y="44" font-size="46" font-weight="900" fill="white" font-family="sans-serif">d</text>
+    </svg>
+  </div>
+  <div id="ob-title">d<span>Stream</span></div>
+  <div id="ob-tagline"></div>
+  <div id="ob-btns">
+    <button id="ob-google" onclick="obSignIn()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+      <span id="ob-google-text">Sign in with Google</span>
+    </button>
+    <button id="ob-guest" onclick="obGuest()"><span id="ob-guest-text">Continue as Guest</span></button>
+  </div>
+  <div id="ob-note"><span id="ob-note-text"></span></div>
+</div>
+
+<script>
+(function(){
+  if(localStorage.getItem('ds_theme')==='light'){
+    document.body.classList.add('light');
+  }
+})();
+</script>
+
+<script src="supabase.js"></script>
+<script>
+const _sb = supabase.createClient(
+  'https://ayxfpslgoihretkfbqwh.supabase.co',
+  'sb_publishable_G9np31a1ppKTG2mgPaK50g_DteosV6x'
+);
+</script>
+
+<canvas id="canvas"></canvas>
+
+<div id="hud">
+  <div id="header">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="hamburger-btn" onclick="openSidePanel()" aria-label="Menu" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:14px;cursor:pointer;padding:8px 10px;display:flex;flex-direction:column;gap:5px;justify-content:center;flex-shrink:0;">
+        <span style="display:block;width:20px;height:2px;background:var(--hamburger-line, rgba(255,255,255,0.8));border-radius:2px;transition:all 0.2s;"></span>
+        <span style="display:block;width:20px;height:2px;background:var(--hamburger-line, rgba(255,255,255,0.8));border-radius:2px;transition:all 0.2s;"></span>
+        <span style="display:block;width:20px;height:2px;background:var(--hamburger-line, rgba(255,255,255,0.8));border-radius:2px;transition:all 0.2s;"></span>
+      </button>
+      <div>
+      <div id="app-title">dStream</div>
+      <div id="app-subtitle" data-i18n="subtitle">Hours · Progress · Flow</div>
+    </div></div>
+    <div id="stats-pill" onclick="openChart()">
+      <div id="total-hours">0h total</div>
+      <div id="stats-label" style="font-size:9px;opacity:0.6;margin-top:1px;">STATS ↑</div>
+    </div>
+  </div>
+  <div id="cam-controls">
+    
+      </div>
+</div>
+
+<!-- BOTTOM DOCK — two buttons -->
+<div id="bottom-bar">
+  <button class="dock-btn" id="btn-new-stream" onclick="openModal()">
+    <span style="font-size:20px;line-height:1">＋</span> <span data-i18n="newStream">New Stream</span>
+  </button>
+  <button class="dock-btn" id="btn-fit-all" onclick="fitAll()">
+    <span id="fit-icon" style="font-size:18px;line-height:1">⊡</span>
+    <span id="fit-label" style="font-size:10px;letter-spacing:0.04em;opacity:0.7;margin-left:4px;font-family:monospace;"></span>
+  </button>
+</div>
+
+<!-- HOURS SHEET -->
+<div id="hours-overlay" onclick="closeHoursSheet()"></div>
+<div id="hours-sheet">
+  <div id="hours-sheet-title">Add 1 hour to a stream</div>
+  <div id="hours-list"></div>
+  <button id="hours-sheet-close" onclick="closeHoursSheet()">Close</button>
+</div>
+
+<div id="undo-toast">
+  <span id="undo-msg">+1h added</span>
+  <button id="undo-btn" onclick="undoLastHour()">↩ Undo</button>
+</div>
+<div id="edit-overlay" onclick="closeEditSheet()"></div>
+<div id="edit-sheet">
+  <div style="width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,0.2);margin:0 auto 20px;"></div>
+  <div id="edit-sheet-name" style="font-size:18px;font-weight:800;margin-bottom:16px;"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <span style="font-size:12px;color:var(--muted);" id="edit-color-label">Color</span>
+    <button id="edit-see-all" onclick="toggleEditExpand()" style="background:none;border:none;color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;padding:0;">See all</button>
+  </div>
+  <div id="edit-color-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;padding:6px 2px 8px;overflow:hidden;"></div>
+  <style>#edit-color-grid.expanded{display:flex;flex-wrap:wrap;overflow:visible;}</style>
+  <button onclick="editDelete()" style="width:100%;padding:14px;border-radius:14px;border:none;background:rgba(255,60,60,0.12);color:#ff6666;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;" data-i18n="deleteStream">Delete Stream</button>
+  <button onclick="closeEditSheet()" style="width:100%;padding:14px;border-radius:14px;border:none;background:rgba(255,255,255,0.07);color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="done">Done</button>
+</div>
+
+<div id="del-overlay" onclick="closeDelSheet()"></div>
+<div id="del-sheet">
+  <div id="del-name"></div><div id="del-meta"></div>
+  <button class="sbt sbt-del" onclick="confirmDelete()" data-i18n="deleteStream">Delete Stream</button>
+  <button class="sbt sbt-cancel" onclick="closeDelSheet()" data-i18n="cancel">Cancel</button>
+</div>
+<div id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div id="modal">
+    <h2 data-i18n="newStreamModal">New Stream</h2>
+    <input type="text" id="sname" placeholder="e.g. English Studies" maxlength="30">
+    <div class="macts">
+      <button class="mbtn mbtn-c" onclick="closeModal()" data-i18n="cancel">Cancel</button>
+      <button class="mbtn mbtn-ok" onclick="createStream()" data-i18n="create">Create</button>
+    </div>
+  </div>
+</div>
+<div id="chart-panel">
+  <div class="chart-hdr"><h2 id="chart-title">Progress Stats</h2><button id="close-chart" onclick="closeChart()">✕</button></div>
+  <div class="cbars" id="cbars"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  CANVAS 3D ENGINE
+//  Pure software renderer — no CSS 3D, no perspective tricks.
+//  Camera: position (eye), target, up vector.
+//  Google Maps style controls:
+//    - One finger: pan the ground plane
+//    - Two fingers: pinch = real zoom, drag = tilt (rotX)
+//    - Twist gesture: orbit (rotY)
+// ══════════════════════════════════════════════════════════
+
+// First 8 shown by default, rest revealed with "See all"
+const COLORS = [
+  // Reds
+  {bg:'#ff3b30',dk:'#cc1100',rgb:[255,59,48]},
+  {bg:'#ff6b6b',dk:'#cc3333',rgb:[255,107,107]},
+  {bg:'#ff8787',dk:'#cc4444',rgb:[255,135,135]},
+  {bg:'#ffa8a8',dk:'#cc5555',rgb:[255,168,168]},
+  // Oranges
+  {bg:'#ff9500',dk:'#cc6600',rgb:[255,149,0]},
+  {bg:'#ff922b',dk:'#cc6600',rgb:[255,146,43]},
+  {bg:'#ffc078',dk:'#cc8833',rgb:[255,192,120]},
+  {bg:'#ffd8a8',dk:'#cc9966',rgb:[255,216,168]},
+  // Yellows
+  {bg:'#ffcc00',dk:'#cc9900',rgb:[255,204,0]},
+  {bg:'#ffd93d',dk:'#ccaa00',rgb:[255,217,61]},
+  {bg:'#ffec99',dk:'#ccaa33',rgb:[255,236,153]},
+  // Greens
+  {bg:'#34c759',dk:'#1a8833',rgb:[52,199,89]},
+  {bg:'#6bcb77',dk:'#3a9944',rgb:[107,203,119]},
+  {bg:'#a9e34b',dk:'#77aa11',rgb:[169,227,75]},
+  {bg:'#69db7c',dk:'#33aa55',rgb:[105,219,124]},
+  {bg:'#63e6be',dk:'#22bb88',rgb:[99,230,190]},
+  {bg:'#20c997',dk:'#009966',rgb:[32,201,151]},
+  {bg:'#96f2d7',dk:'#44ccaa',rgb:[150,242,215]},
+  // Teals & Cyans
+  {bg:'#00c7be',dk:'#008888',rgb:[0,199,190]},
+  {bg:'#66d9e8',dk:'#22aacc',rgb:[102,217,232]},
+  {bg:'#4af7f7',dk:'#2ac4c4',rgb:[74,247,247]},
+  // Blues
+  {bg:'#007aff',dk:'#0055cc',rgb:[0,122,255]},
+  {bg:'#4d96ff',dk:'#1a66cc',rgb:[77,150,255]},
+  {bg:'#74c0fc',dk:'#3388cc',rgb:[116,192,252]},
+  {bg:'#1c7ed6',dk:'#0055aa',rgb:[28,126,214]},
+  {bg:'#6ab4f7',dk:'#3a80c4',rgb:[106,180,247]},
+  // Purples
+  {bg:'#5856d6',dk:'#3333aa',rgb:[88,86,214]},
+  {bg:'#7c6af7',dk:'#5a4ad1',rgb:[124,106,247]},
+  {bg:'#748ffc',dk:'#4455cc',rgb:[116,143,252]},
+  {bg:'#b197fc',dk:'#7744dd',rgb:[177,151,252]},
+  // Pinks & Magentas
+  {bg:'#ff2d55',dk:'#cc0033',rgb:[255,45,85]},
+  {bg:'#f06595',dk:'#cc2266',rgb:[240,101,149]},
+  {bg:'#ff6b81',dk:'#cc2244',rgb:[255,107,129]},
+  {bg:'#cc5de8',dk:'#9922bb',rgb:[204,93,232]},
+  {bg:'#da77f2',dk:'#aa44cc',rgb:[218,119,242]},
+  {bg:'#e599f7',dk:'#bb55dd',rgb:[229,153,247]},
+  // Neutrals
+  {bg:'#8e8e93',dk:'#555558',rgb:[142,142,147]},
+  {bg:'#eeeeee',dk:'#aaaaaa',rgb:[238,238,238]},
+];
+const COLORS_BASIC = COLORS.slice(0, 8);
+const COLORS_EXT = COLORS.slice(8);
+
+let streams=[], selColor=0, selectedId=null, lastAddId=null, undoTmr=null, pendingDelId=null, pendingEditId=null;
+const Cap = window?.Capacitor?.Plugins?.Preferences;
+let arrowHits=[];
+let _sbUser = null;
+let isDark = localStorage.getItem('ds_theme') !== 'light';
+let currentLang = localStorage.getItem('ls_lang') || localStorage.getItem('ds_lang') || 'en';
+let _spLang = localStorage.getItem('ds_lang') || localStorage.getItem('ls_lang') || 'en';
+let STRINGS, SP_I18N;
+
+// ── CAMERA STATE ──
+// Google Maps style spherical coords:
+//   dist  : distance from target (zoom)
+//   tilt  : angle from vertical (0=top-down, 70=near eye-level)
+//   azimuth: rotation around Y axis (orbit)
+//   target: world-space point camera looks at
+const CAM = {
+  dist: 520,
+  tilt: 22,
+  azimuth: 180,
+  tx: 0, ty: 0, tz: 80,
+};
+const CAM_HOME = { dist:520, tilt:22, azimuth:180, tx:0, ty:0, tz:80 };
+const DIST_MIN = 150, DIST_MAX = 2200;
+
+// World layout
+const LANE_GAP  = 90;   // X spacing between lanes
+const UNIT      = 55;   // Z units per hour (checker moves +Z = away)
+const DISC_R    = 26;   // checker radius
+const DISC_H    = 12;   // checker thickness
+
+// ── CANVAS SETUP ──
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+
+function resizeCanvas(){
+  DPR = window.devicePixelRatio || 1;
+  const barH = document.getElementById('bottom-bar').offsetHeight || 90;
+  const headerH = 68;
+  W = window.innerWidth;
+  H = window.innerHeight - headerH - barH;
+  canvas.style.width = W + "px";
+  canvas.style.height = window.innerHeight + "px";
+  canvas.width  = W * DPR;
+  canvas.height = window.innerHeight * DPR;
+  ctx.scale(DPR, DPR);
+  render();
+}
+window.addEventListener('resize', ()=>{ resizeCanvas(); render(); });
+
+// ── App init moved to bottom ──
+
+
+// ── MATH UTILS ──
+function degToRad(d){ return d * Math.PI / 180; }
+
+// Build camera matrices from spherical coords
+function buildCamera(){
+  const tiltR = degToRad(CAM.tilt);
+  const aziR  = degToRad(CAM.azimuth);
+  // Eye position in spherical coords around target
+  const sinT = Math.sin(tiltR), cosT = Math.cos(tiltR);
+  const sinA = Math.sin(aziR),  cosA = Math.cos(aziR);
+  const eye = {
+    x: CAM.tx + CAM.dist * sinT * sinA,
+    y: CAM.ty + CAM.dist * cosT,
+    z: CAM.tz + CAM.dist * sinT * cosA,  // positive Z = toward viewer in default
+  };
+  // View matrix (lookAt)
+  const fwd = normalize({ x: CAM.tx-eye.x, y: CAM.ty-eye.y, z: CAM.tz-eye.z });
+  const right = normalize(cross(fwd, {x:0,y:1,z:0}));
+  const up = cross(right, fwd);
+  return { eye, fwd, right, up };
+}
+
+function buildCameraFrom(c){
+  const tiltR = degToRad(c.tilt);
+  const aziR  = degToRad(c.azimuth);
+  const sinT = Math.sin(tiltR), cosT = Math.cos(tiltR);
+  const sinA = Math.sin(aziR),  cosA = Math.cos(aziR);
+  const eye = {
+    x: c.tx + c.dist * sinT * sinA,
+    y: (c.ty||0) + c.dist * cosT,
+    z: c.tz + c.dist * sinT * cosA,
+  };
+  const fwd = normalize({ x: c.tx-eye.x, y: (c.ty||0)-eye.y, z: c.tz-eye.z });
+  const right = normalize(cross(fwd, {x:0,y:1,z:0}));
+  const up = cross(right, fwd);
+  return { eye, fwd, right, up };
+}
+
+function normalize(v){
+  const l = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z) || 1;
+  return {x:v.x/l, y:v.y/l, z:v.z/l};
+}
+function cross(a,b){
+  return {x:a.y*b.z-a.z*b.y, y:a.z*b.x-a.x*b.z, z:a.x*b.y-a.y*b.x};
+}
+function dot(a,b){ return a.x*b.x + a.y*b.y + a.z*b.z; }
+
+// Project world point to screen
+function project(cam, p){
+  const rel = {x:p.x-cam.eye.x, y:p.y-cam.eye.y, z:p.z-cam.eye.z};
+  // Camera space
+  const cx = dot(rel, cam.right);
+  const cy = dot(rel, cam.up);
+  const cz = dot(rel, cam.fwd); // positive = in front of camera
+  if(cz <= 0.1) return null; // behind camera
+  // Perspective projection — true perspective, not CSS trick
+  const fov = 500; // focal length in pixels
+  const sx = W/2 + (cx / cz) * fov;
+  const sy = H/2 - (cy / cz) * fov;
+  return { x:sx, y:sy, z:cz, scale: fov/cz };
+}
+
+// ── RENDER ──
+function laneDepth(cam, laneX, maxZ){
+  const p = project(cam, {x:laneX, y:0, z:maxZ/2});
+  return p ? p.z : 9999;
+}
+
+function drawGrid(cam){
+  // Background fill — full screen
+  ctx.fillStyle = bgColor();
+  ctx.fillRect(0, 0, W, window.innerHeight);
+
+  const size = 1800, step = 60;
+  ctx.strokeStyle = gridColor();
+  ctx.lineWidth = 0.5;
+  for(let x=-size; x<=size; x+=step){
+    const a = project(cam,{x,y:0,z:-size});
+    const b = project(cam,{x,y:0,z:size});
+    if(!a||!b) continue;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  for(let z=-size; z<=size; z+=step){
+    const a = project(cam,{x:-size,y:0,z});
+    const b = project(cam,{x:size,y:0,z});
+    if(!a||!b) continue;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+}
+
+function drawLane(cam, c){
+  const { laneX, col, maxZ } = c;
+  // Track line
+  const a = project(cam, {x:laneX, y:0, z:0});
+  const b = project(cam, {x:laneX, y:0, z:maxZ});
+  if(!a||!b) return;
+  if(!isFinite(a.x)||!isFinite(a.y)||!isFinite(b.x)||!isFinite(b.y)) return;
+  const dx=b.x-a.x, dy=b.y-a.y;
+  if(dx*dx+dy*dy < 0.01) return;
+  // Project checker position to skip drawing lane through it
+  const checkerP = project(cam, {x:laneX, y:0, z:c.maxZ - UNIT*4});
+  const skipR = checkerP ? Math.max(6, DISC_R * checkerP.scale) + 4 : 0;
+  const grad = ctx.createLinearGradient(a.x,a.y,b.x,b.y);
+  grad.addColorStop(0, col.bg + 'aa');
+  grad.addColorStop(1, 'transparent');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = Math.max(1.5, a.scale * 1.5);
+  if(skipR > 0 && checkerP){
+    // Draw lane in two parts: origin→below checker, above checker→end
+    const lx=b.x-a.x, ly=b.y-a.y, len=Math.hypot(lx,ly);
+    const ux=lx/len, uy=ly/len;
+    const cx2=checkerP.x, cy2=checkerP.y;
+    const stopX=cx2-ux*skipR, stopY=cy2-uy*skipR;
+    const resumeX=cx2+ux*skipR, resumeY=cy2+uy*skipR;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(stopX,stopY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(resumeX,resumeY); ctx.lineTo(b.x,b.y); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+
+  // Origin dot
+  if(a){
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, Math.max(3, a.scale*3), 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fill();
+  }
+
+  // Hour ticks — skip when too zoomed out to be readable
+  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.3)';
+  ctx.textAlign = 'left';
+  for(let t=5; t<=50; t+=5){
+    const tp = project(cam, {x:laneX+4, y:0, z:t*UNIT});
+    if(!tp) continue;
+    if(tp.scale < 0.35) continue; // too small to read, skip
+    const sz = Math.max(7, Math.min(10, tp.scale*11));
+    ctx.font = `500 ${sz}px 'SF Mono', ui-monospace, Consolas, monospace`;
+    ctx.fillText(t+'h', tp.x+4, tp.y);
+  }
+}
+
+function drawChecker(cam, c){
+  const { cx, cy, cz, col, hours, name, proj } = c;
+  const sc = proj.scale;
+  const px = proj.x, py = proj.y;
+  const r = Math.max(6, DISC_R * sc);
+  const [rr,gg,bb] = col.rgb;
+
+  // Shadow — only draw when checker is large enough to matter
+  if(r > 14){
+    ctx.beginPath();
+    ctx.arc(px, py + r*0.12, r*0.82, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fill();
+  }
+
+  // Guard against non-finite projection
+  if(!isFinite(px)||!isFinite(py)||!isFinite(r)||r<=0) return;
+
+  // Main circle
+  const grad = ctx.createRadialGradient(px - r*0.3, py - r*0.3, r*0.05, px, py, r);
+  grad.addColorStop(0,   col.bg + 'ff');
+  grad.addColorStop(0.7, col.bg + 'ee');
+  grad.addColorStop(1,   col.dk + 'ff');
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI*2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Inner ring
+  ctx.beginPath();
+  ctx.arc(px, py, r*0.78, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = Math.max(0.8, sc*1.2);
+  ctx.stroke();
+
+  // Gloss — only on large checkers
+  if(r > 18){
+    const gloss = ctx.createRadialGradient(px-r*0.2, py-r*0.25, 0, px, py, r*0.7);
+    gloss.addColorStop(0, 'rgba(255,255,255,0.22)');
+    gloss.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+    gloss.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI*2);
+    ctx.fillStyle = gloss;
+    ctx.fill();
+  }
+
+  // Hours
+  const fontSize = Math.max(9, Math.min(22, r * 0.72));
+  ctx.font = `800 ${fontSize}px 'SF Mono', ui-monospace, Consolas, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = Math.max(2, fontSize * 0.18);
+  ctx.lineJoin = 'round';
+  ctx.strokeText(hours, px, py);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(hours, px, py);
+
+  // Name label
+  const lblFSize = Math.max(8, Math.min(13, sc*14));
+  ctx.font = `700 ${lblFSize}px -apple-system, BlinkMacSystemFont, 'SF Pro Display', Roboto, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  const lblY = py - r - 6;
+  const lblW = ctx.measureText(name).width;
+  const pad = 5;
+  ctx.fillStyle = isDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.8)';
+  const rx2=px-lblW/2-pad, ry2=lblY-lblFSize-2, rw2=lblW+pad*2, rh2=lblFSize+4, rr2=4;
+  ctx.beginPath();
+  ctx.moveTo(rx2+rr2,ry2); ctx.lineTo(rx2+rw2-rr2,ry2); ctx.arcTo(rx2+rw2,ry2,rx2+rw2,ry2+rh2,rr2);
+  ctx.lineTo(rx2+rw2,ry2+rh2-rr2); ctx.arcTo(rx2+rw2,ry2+rh2,rx2,ry2+rh2,rr2);
+  ctx.lineTo(rx2+rr2,ry2+rh2); ctx.arcTo(rx2,ry2+rh2,rx2,ry2,rr2);
+  ctx.lineTo(rx2,ry2+rr2); ctx.arcTo(rx2,ry2,rx2+rr2,ry2,rr2);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = isDark ? col.bg : col.dk;
+  ctx.fillText(name, px, lblY);
+
+  // Flash ring for tier highlight
+  if(_flashIds && _flashIds.includes(c.id) && !c.selected){
+    ctx.beginPath();
+    ctx.arc(px, py, r+10, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(px, py, r+16, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // Selection ring + arrows
+  if(c.selected){
+    ctx.beginPath();
+    ctx.arc(px, py, r+8, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Fixed screen-space arrow buttons — same size regardless of depth
+    const BR = Math.max(20, Math.min(32, r * 0.88));
+    const aheadX = px, aheadY = py - r - BR - 10;
+    const behindX = px, behindY = py + r + BR + 10;
+    _drawArrowBtn(aheadX, aheadY, BR, col.bg, '+');
+    arrowHits.push({id:c.id, type:'add', x:aheadX-BR*1.2, y:aheadY-BR*1.2, w:BR*2.4, h:BR*2.4});
+    if(cz > UNIT*0.1){
+      _drawArrowBtn(behindX, behindY, BR, '#ff5555', '-');
+      arrowHits.push({id:c.id, type:'sub', x:behindX-BR*1.2, y:behindY-BR*1.2, w:BR*2.4, h:BR*2.4});
+    }
+  }
+}
+
+function _drawArrowBtn(x, y, r, color, glyph){
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.fillStyle = color+'cc'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.5; ctx.stroke();
+  const fs = Math.max(12, r*0.8);
+  ctx.font = `900 ${fs}px -apple-system, BlinkMacSystemFont, 'SF Pro Display', Roboto, sans-serif`;
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(glyph, x, y);
+}
+
+STRINGS = {
+  en: {
+    newStream:    'New Stream',
+    settings:     'Settings',
+    language:     'Language',
+    appearance:   'Appearance',
+    darkMode:     'Dark Mode',
+    done:         'Done',
+    hoursSheetTitle: 'Tap + to add · − to subtract',
+    statsUp:      'STATS ↑',
+    totalHours:   'h total',
+    subtitle:     'HOURS · PROGRESS · FLOW',
+    newStreamModal:'New Stream',
+    placeholder:  'e.g. English Studies',
+    cancel:       'Cancel',
+    create:       'Create',
+    deleteStream: 'Delete Stream',
+    done:         'Done',
+    progressStats:'Progress Stats',
+    noStreams:    'No streams yet',
+    tapHint:      'Tap a checker to select',
+    addFirst:     'ADD YOUR FIRST STREAM',
+    totalHours2:  'Total Hours',
+    totalDays2:   'Active Days',
+    summary:      'Summary',
+    streams:      'Streams',
+    seeAll:       'See all',
+    less:         'Less',
+    saved:        'Saved',
+    color:        'Color',
+    streak:       'd streak',
+    hoursUnit:    'h',
+  },
+  ru: {
+    newStream:    'Новый поток',
+    settings:     'Настройки',
+    language:     'Язык',
+    appearance:   'Оформление',
+    darkMode:     'Тёмный режим',
+    done:         'Готово',
+    hoursSheetTitle: 'Нажми + добавить · − убрать',
+    statsUp:      'СТАТИСТИКА ↑',
+    totalHours:   'ч всего',
+    subtitle:     'ЧАСЫ · ПРОГРЕСС · ПОТОК',
+    newStreamModal:'Новый поток',
+    placeholder:  'напр. Английский',
+    cancel:       'Отмена',
+    create:       'Создать',
+    deleteStream: 'Удалить поток',
+    done:         'Готово',
+    progressStats:'Прогресс',
+    noStreams:    'Потоков пока нет',
+    tapHint:      'Нажми на шашку',
+    addFirst:     'ДОБАВЬ ПЕРВЫЙ ПОТОК',
+    totalHours2:  'Часов всего',
+    totalDays2:   'Активных дней',
+    summary:      'Итого',
+    streams:      'Потоков',
+    seeAll:       'Все',
+    less:         'Скрыть',
+    saved:        'Сохранено',
+    color:        'Цвет',
+    streak:       'д подряд',
+    hoursUnit:    'ч',
+  }
+};
+
+function t(key){ if(!STRINGS) return key; return (STRINGS[currentLang]||STRINGS.en)[key] || key; }
+
+function applyLang(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    el.textContent = t(el.dataset.i18n);
+  });
+  const inp = document.getElementById('sname');
+  if(inp) inp.placeholder = t('placeholder');
+  const hst = document.getElementById('hours-sheet-title');
+  if(hst) hst.textContent = t('hoursSheetTitle');
+  document.getElementById('lang-en')?.classList.toggle('active', currentLang==='en');
+  document.getElementById('lang-ru')?.classList.toggle('active', currentLang==='ru');
+  document.documentElement.lang = currentLang;
+  const _sl = document.getElementById('stats-label');
+  if(_sl) _sl.textContent = t('statsUp');
+  const _ct = document.getElementById('chart-title');
+  if(_ct) _ct.textContent = t('progressStats');
+  const _cl = document.getElementById('edit-color-label');
+  if(_cl) _cl.textContent = t('color');
+  try{ updateStats(); }catch(e){}
+}
+
+function setLang(lang){
+  currentLang = lang;
+  localStorage.setItem('ls_lang', lang);
+  applyLang();
+  try{ render(); }catch(e){}
+}
+
+function initCP(){
+  const cp = document.getElementById('cpicker');
+  if(!cp) return;
+  cp.innerHTML = '';
+  COLORS.forEach((c,i)=>{
+    const sw = document.createElement('div');
+    sw.className = 'cswatch' + (i===selColor?' sel':'');
+    sw.style.background = c.bg;
+    sw.onclick = ()=>{
+      selColor = i;
+      document.querySelectorAll('.cswatch').forEach((el,j)=>el.classList.toggle('sel',j===i));
+    };
+    cp.appendChild(sw);
+  });
+}
+
+function drawEmpty(){
+  const cx=W/2, cy=H*0.42;
+  ctx.font = '600 15px -apple-system, BlinkMacSystemFont, Roboto, sans-serif';
+  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(30,20,80,0.3)';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(t('noStreams'), cx, cy);
+}
+
+// ══ TOUCH HANDLING — Google Maps style ══
+// One finger  : pan (move target on ground plane)
+// Two fingers : pinch = zoom dist, vertical drag = tilt, twist = azimuth
+let t1=null, pinch0=null, _touchMoved=false;
+let _velX=0, _velZ=0, _lastMoveTime=0, _momentumRaf=null;
+let _longPressTimer=null, _longPressId=null;
+
+function screenToGround(cam, sx, sy){
+  // Cast ray from screen point to ground plane (y=0)
+  const fov = 500;
+  const rx = (sx - W/2) / fov;
+  const ry = -(sy - H/2) / fov;
+  // Ray in camera space
+  const rayDir = normalize({
+    x: rx*cam.right.x + ry*cam.up.x + cam.fwd.x,
+    y: rx*cam.right.y + ry*cam.up.y + cam.fwd.y,
+    z: rx*cam.right.z + ry*cam.up.z + cam.fwd.z,
+  });
+  // Intersect with y=0 plane
+  if(Math.abs(rayDir.y) < 0.0001) return null;
+  const t = -cam.eye.y / rayDir.y;
+  if(t < 0) return null;
+  return {
+    x: cam.eye.x + rayDir.x * t,
+    z: cam.eye.z + rayDir.z * t,
+  };
+}
+
+// Suppress synthetic click after touch
+let _lastTouchEnd = 0;
+
+canvas.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  _touchMoved = false;
+  // Cancel any pending long-press
+  clearTimeout(_longPressTimer); _longPressId = null;
+
+  if(e.touches.length === 1){
+    pinch0 = null;
+    const _r = canvas.getBoundingClientRect();
+    t1 = {
+      x: e.touches[0].clientX,       // screen coords (for pan math)
+      y: e.touches[0].clientY,
+      cx: e.touches[0].clientX - _r.left,  // canvas coords (for hit test)
+      cy: e.touches[0].clientY - _r.top,
+      tx: CAM.tx, tz: CAM.tz,
+      cam: buildCamera(),
+    };
+    // Start long-press detection — check if finger is on a checker
+    _longPressTimer = setTimeout(()=>{
+      if(!_touchMoved && t1){
+        const hitId = _checkerAtCanvas(t1.cx, t1.cy);
+        if(hitId){
+          _longPressId = hitId;
+          selectedId = null; // deselect arrow mode
+          openEditSheet(hitId);
+        }
+      }
+    }, 600);
+  } else if(e.touches.length === 2){
+    clearTimeout(_longPressTimer);
+    t1 = null;
+    const dx = e.touches[1].clientX - e.touches[0].clientX;
+    const dy = e.touches[1].clientY - e.touches[0].clientY;
+    pinch0 = {
+      dist0:   Math.hypot(dx, dy),
+      angle0:  Math.atan2(dy, dx),
+      midY0:   (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      camDist: CAM.dist,
+      camTilt: CAM.tilt,
+      camAz:   CAM.azimuth,
+      tx: CAM.tx, tz: CAM.tz,
+    };
+  }
+},{passive:false});
+
+canvas.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  // Only flag as moved if finger actually traveled > 8px (ignore micro-movements on iOS)
+  if(t1){
+    const dx = e.touches[0].clientX - t1.x;
+    const dy = e.touches[0].clientY - t1.y;
+    if(Math.sqrt(dx*dx+dy*dy) > 8) _touchMoved = true;
+  } else { _touchMoved = true; }
+  if(_touchMoved) clearTimeout(_longPressTimer); // movement cancels long-press
+  if(e.touches.length === 1 && t1){
+    const cam = t1.cam;
+    const prev = screenToGround(cam, t1.x, t1.y);
+    const curr = screenToGround(cam, e.touches[0].clientX, e.touches[0].clientY);
+    if(prev && curr){
+      const n = streams.length || 1;
+      const maxX = Math.max((n-1) * LANE_GAP * 0.7, 200);
+      const maxZ = Math.max(Math.max(...streams.map(s=>s.hours*UNIT), 0) + 300, 400);
+      const newTx = Math.max(-maxX, Math.min(maxX, t1.tx + (prev.x - curr.x)));
+      const newTz = Math.max(-200, Math.min(maxZ, t1.tz + (prev.z - curr.z)));
+      const now2 = Date.now();
+      const dt = Math.max(1, now2 - _lastMoveTime);
+      _velX = (newTx - CAM.tx) / dt * 16;
+      _velZ = (newTz - CAM.tz) / dt * 16;
+      _lastMoveTime = now2;
+      CAM.tx = newTx; CAM.tz = newTz;
+    }
+    requestRender();
+  } else if(e.touches.length === 2 && pinch0){
+    const dx = e.touches[1].clientX - e.touches[0].clientX;
+    const dy = e.touches[1].clientY - e.touches[0].clientY;
+    const dist  = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    const midY  = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    CAM.dist = Math.max(DIST_MIN, Math.min(DIST_MAX, pinch0.camDist * (pinch0.dist0 / dist)));
+    CAM.tilt = Math.max(5, Math.min(85, pinch0.camTilt + (midY - pinch0.midY0) * 0.3));
+    requestRender();
+  }
+},{passive:false});
+
+canvas.addEventListener('touchend', e=>{
+  clearTimeout(_longPressTimer);
+  if(e.touches.length < 2) pinch0 = null;
+  if(e.touches.length === 0){
+    _lastTouchEnd = Date.now();
+    if(!_touchMoved && !_longPressId && t1){
+      _handleTap(t1.cx, t1.cy);
+    } else if(_touchMoved){
+      // Momentum scroll
+      if(_momentumRaf) cancelAnimationFrame(_momentumRaf);
+      const n2 = streams.length || 1;
+      const maxX2 = Math.max((n2-1)*LANE_GAP*0.7, 200);
+      const maxZ2 = Math.max(Math.max(...streams.map(s=>s.hours*UNIT), 0)+300, 400);
+      let vx=_velX, vz=_velZ;
+      function momentum(){
+        vx *= 0.88; vz *= 0.88;
+        if(Math.abs(vx)<0.3 && Math.abs(vz)<0.3){ _momentumRaf=null; return; }
+        CAM.tx = Math.max(-maxX2, Math.min(maxX2, CAM.tx + vx));
+        CAM.tz = Math.max(-200, Math.min(maxZ2, CAM.tz + vz));
+        requestRender();
+        _momentumRaf = requestAnimationFrame(momentum);
+      }
+      _momentumRaf = requestAnimationFrame(momentum);
+    }
+    _longPressId = null;
+    t1 = null;
+  }
+},{passive:true});
+
+// Suppress the synthetic mouse click that fires ~300ms after touchend on mobile
+canvas.addEventListener('click', e=>{
+  if(Date.now() - _lastTouchEnd < 500) return; // swallow synthetic click
+  const _r2 = canvas.getBoundingClientRect();
+  _handleTap(e.clientX - _r2.left, e.clientY - _r2.top);
+});
+
+// Find which checker (if any) is at screen coords — used for long-press
+function _checkerAtCanvas(cx, cy){
+  const cam = buildCamera();
+  // cy needs to account for the 68px render offset applied in render()
+  const _hOff = 68;
+  const adjCy = cy - _hOff;
+  let hit = null, bestD = Infinity;
+  streams.forEach((s, i)=>{
+    const laneX = (i-(streams.length-1)/2)*LANE_GAP;
+    const cz = s._animZ !== undefined ? s._animZ : s.hours*UNIT;
+    const cp = project(cam, {x:laneX, y:0, z:cz}); if(!cp) return;
+    const pR = project(cam, {x:laneX+DISC_R, y:0, z:cz});
+    const projR = pR ? Math.abs(cp.x - pR.x) * 1.6 : DISC_R * cp.scale * 1.6;
+    // Large hit radius when zoomed out so taps always register
+    const screenR = Math.max(56, projR);
+    const dx = cx - cp.x, dy = adjCy - cp.y;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if(d <= screenR && d < bestD){ bestD = d; hit = s.id; }
+  });
+  return hit;
+}
+
+
+function _handleTap(cx, cy){
+  // cx, cy are canvas-relative CSS pixel coords
+  // Arrow hits are in render-space (offset by 68px) — adjust cy
+  const _hOff = 68;
+  const adjCy = cy - _hOff;
+  for(const h of arrowHits){
+    if(cx>=h.x && cx<=h.x+h.w && adjCy>=h.y && adjCy<=h.y+h.h){
+      if(h.type==='add') addHour(h.id);
+      else subHour_canvas(h.id);
+      return;
+    }
+  }
+  // Check checker hit — toggle selection + auto zoom if too small
+  const hit = _checkerAtCanvas(cx, cy);
+  if(hit){
+    if(selectedId === hit){
+      selectedId = null;
+      render();
+    } else {
+      selectedId = hit;
+      render(); // show selection ring immediately
+      // Always zoom to checker so arrows are always reachable
+      const si = streams.findIndex(s=>s.id===hit);
+      if(si >= 0) _zoomToChecker(si);
+    }
+  } else {
+    selectedId = null;
+    render();
+  }
+}
+
+function subHour_canvas(id){
+  const s=streams.find(s=>s.id===id); if(!s||s.hours===0) return;
+  const fromZ=s._animZ!==undefined?s._animZ:s.hours*UNIT;
+  s.hours=Math.max(0,s.hours-1);
+  if(s.log&&s.log.length) s.log.pop();
+  lastAddId=id; save(); updateStats();
+  animateCheckersTo(id, fromZ, s.hours*UNIT);
+  document.getElementById('undo-msg').textContent='−1h ← "'+s.name+'"';
+  document.getElementById('undo-toast').classList.add('show');
+  clearTimeout(undoTmr); undoTmr=setTimeout(hideUndoToast,4500);
+}
+
+// Button zoom
+function adjustZoom(factor){
+  CAM.dist = Math.max(DIST_MIN, Math.min(DIST_MAX, CAM.dist * (1/factor)));
+  render();
+}
+
+// Home
+function goHome(){
+  const steps=20;
+  let step=0;
+  const from = { dist:CAM.dist, tilt:CAM.tilt, az:CAM.azimuth, tx:CAM.tx, tz:CAM.tz };
+  const ease = t => 1 - Math.pow(1-t, 3);
+  function animate(){
+    step++;
+    const t = ease(step/steps);
+    CAM.dist    = from.dist    + (CAM_HOME.dist-from.dist)*t;
+    CAM.tilt    = from.tilt    + (CAM_HOME.tilt-from.tilt)*t;
+    CAM.azimuth = from.az      + (CAM_HOME.azimuth-from.az)*t;
+    CAM.tx      = from.tx      + (CAM_HOME.tx-from.tx)*t;
+    CAM.tz      = from.tz      + (CAM_HOME.tz-from.tz)*t;
+    render();
+    if(step<steps) requestAnimationFrame(animate);
+    else { Object.assign(CAM, CAM_HOME); render(); }
+  }
+  requestAnimationFrame(animate);
+}
+
+// ══ ANIMATION for smooth checker movement ══
+const animTargets = {}; // id → { from, to, t }
+let animFrame = null;
+
+function animateCheckersTo(id, fromZ, toZ){
+  animTargets[id] = { from:fromZ, to:toZ, t:0 };
+  if(!animFrame) animFrame = requestAnimationFrame(animStep);
+}
+function animStep(){
+  let any=false;
+  Object.keys(animTargets).forEach(id=>{
+    const a=animTargets[id];
+    a.t = Math.min(1, a.t+0.08);
+    const ease = 1-Math.pow(1-a.t,3);
+    const s=streams.find(s=>s.id===id);
+    // We store the visual Z separately for animation
+    if(!s){ delete animTargets[id]; return; }
+    s._animZ = a.from + (a.to-a.from)*ease;
+    if(a.t>=1){ s._animZ=a.to; delete animTargets[id]; }
+    else any=true;
+  });
+  render();
+  if(any) animFrame=requestAnimationFrame(animStep);
+  else animFrame=null;
+}
+
+// ══ DATA OPS ══
+// ── THEME ──
+// Apply saved theme immediately
+if(!isDark) document.documentElement.classList.add('light-init');
+function toggleTheme(){
+  isDark = !isDark;
+  localStorage.setItem('ds_theme', isDark ? 'dark' : 'light');
+  document.body.classList.toggle('light', !isDark);
+  const _tb=document.getElementById('theme-btn'); if(_tb) _tb.textContent = isDark ? '☀' : '🌙';
+  const tog = document.getElementById('theme-toggle');
+  if(tog) tog.classList.toggle('on', isDark);
+  if(typeof spSyncTheme==='function') spSyncTheme();
+  render();
+}
+
+function gridColor(){ return isDark ? 'rgba(124,106,247,0.10)' : 'rgba(80,60,200,0.12)'; }
+function bgColor()  { return isDark ? '#0a0a12' : '#e8e8f4'; }
+// ── Multi-map storage ────────────────────────────────────────
+let _maps = [];        // [{id, name, created}]
+let _activeMapId = null;
+
+async function _capGet(key){ try{ if(Cap){ const r=await Cap.get({key}); return r?.value??null; } return localStorage.getItem(key); }catch(e){ return null; } }
+async function _capSet(key,val){ try{ if(Cap) await Cap.set({key,value:val}); else localStorage.setItem(key,val); }catch(e){} }
+async function _capRemove(key){ try{ if(Cap) await Cap.remove({key}); else localStorage.removeItem(key); }catch(e){} }
+
+function _mapKey(id){ return 'ds_map_' + id; }
+
+async function saveMaps(){
+  await _capSet('ds_maps', JSON.stringify(_maps));
+  await _capSet('ds_active_map', _activeMapId || '');
+}
+
+async function saveActiveMap(){
+  if(!_activeMapId) return;
+  await _capSet(_mapKey(_activeMapId), JSON.stringify(streams));
+  if(_sbUser && typeof syncToCloud==='function' && navigator.onLine) syncToCloud();
+}
+
+async function loadMap(id){
+  const data = await _capGet(_mapKey(id));
+  if(data){ streams=JSON.parse(data); streams.forEach(s=>{ s._animZ=s.hours*UNIT; }); }
+  else { streams=[]; }
+}
+
+async function switchMap(id){
+  // Save current map first
+  if(_activeMapId) await saveActiveMap();
+  _activeMapId = id;
+  await saveMaps();
+  await loadMap(id);
+  selectedId = null;
+  renderAll();
+  updateStats();
+  _renderMapsList();
+  // Update header subtitle with map name
+  const m = _maps.find(m=>m.id===id);
+  const sub = document.getElementById('app-subtitle');
+  if(sub && m) sub.textContent = m.name.toUpperCase();
+}
+
+async function createMap(name){
+  const id = Date.now().toString();
+  _maps.push({id, name: name||('Map '+ (_maps.length+1)), created: new Date().toISOString()});
+  await saveMaps();
+  await switchMap(id);
+  _renderMapsList();
+}
+
+async function deleteMap(id){
+  if(_maps.length <= 1){ alert('Cannot delete the last map.'); return; }
+  _maps = _maps.filter(m=>m.id!==id);
+  await _capRemove(_mapKey(id));
+  if(_activeMapId === id){
+    await switchMap(_maps[0].id);
+  } else {
+    await saveMaps();
+    _renderMapsList();
+  }
+}
+
+async function renameMap(id, name){
+  const m = _maps.find(m=>m.id===id);
+  if(m){ m.name=name; await saveMaps(); _renderMapsList(); }
+  if(_activeMapId===id){
+    const sub = document.getElementById('app-subtitle');
+    if(sub) sub.textContent = name.toUpperCase();
+  }
+}
+
+async function save(){
+  await saveActiveMap();
+}
+
+async function load(){
+  try{
+    // Load maps index
+    const mapsData = await _capGet('ds_maps');
+    if(mapsData){ _maps = JSON.parse(mapsData); }
+
+    // Migrate legacy data — if no maps exist, create default map from ls_v13
+    if(!_maps || !_maps.length){
+      const legacyData = await _capGet('ls_v13') ||
+        localStorage.getItem('ls_v13') || localStorage.getItem('ls_v12');
+      const defaultId = Date.now().toString();
+      _maps = [{id: defaultId, name: 'My Streams', created: new Date().toISOString()}];
+      if(legacyData){
+        await _capSet(_mapKey(defaultId), legacyData);
+      }
+      await saveMaps();
+    }
+
+    // Load active map
+    const activeId = await _capGet('ds_active_map');
+    _activeMapId = (activeId && _maps.find(m=>m.id===activeId)) ? activeId : _maps[0].id;
+    await loadMap(_activeMapId);
+
+    // Update subtitle
+    const m = _maps.find(m=>m.id===_activeMapId);
+    const sub = document.getElementById('app-subtitle');
+    if(sub && m) sub.textContent = m.name.toUpperCase();
+  }catch(e){ console.error('load error',e); }
+}
+function ds(d){ return d.toISOString().split('T')[0]; }
+function yday(){ const d=new Date(); d.setDate(d.getDate()-1); return d; }
+
+// Arrow hit areas for canvas tap detection
+
+// Unified render
+// ── RAF-gated render — prevents multiple render() calls per frame ──
+let _renderPending = false;
+function requestRender(){
+  if(_renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(()=>{ _renderPending=false; render(); });
+}
+
+function render(){
+  arrowHits=[];
+  const _hOff = 68;
+  ctx.setTransform(DPR,0,0,DPR,0,_hOff*DPR);
+  ctx.clearRect(0,-_hOff,W,window.innerHeight);
+  if(streams.length===0){ drawEmpty(); return; }
+  const cam=buildCamera();
+  drawGrid(cam);
+  const calls=[];
+  streams.forEach((s,i)=>{
+    const col=COLORS.find(c=>c.bg===s.color)||COLORS[0];
+    const laneX=(i-(streams.length-1)/2)*LANE_GAP;
+    const cz=(s._animZ!==undefined)?s._animZ:s.hours*UNIT;
+    calls.push({type:'lane',laneX,col,maxZ:Math.max(cz+UNIT*4,UNIT*8),depth:laneDepth(cam,laneX,cz)});
+    const cp=project(cam,{x:laneX,y:0,z:cz});
+    if(cp) calls.push({type:'checker',cx:laneX,cy:0,cz,col,hours:s.hours,name:s.name,id:s.id,proj:cp,depth:cp.z,selected:s.id===selectedId});
+  });
+  calls.sort((a,b)=>b.depth-a.depth);
+  calls.forEach(c=>{ if(c.type==='lane') drawLane(cam,c); else drawChecker(cam,c); });
+}
+
+function addHour(id){
+  const s=streams.find(s=>s.id===id); if(!s) return;
+  const fromZ=(s._animZ!==undefined)?s._animZ:s.hours*UNIT;
+  s.hours++;
+  if(!s.log) s.log=[];
+  s.log.push(ds(new Date()));
+  lastAddId=id; save();
+  updateStats();
+  animateCheckersTo(id, fromZ, s.hours*UNIT);
+  document.getElementById('undo-msg').textContent='+1h → "'+s.name+'"'; document.getElementById('undo-toast').classList.add('show'); clearTimeout(undoTmr); undoTmr=setTimeout(hideUndoToast,4500);
+}
+function undoHour(id){
+  const s=streams.find(s=>s.id===id); if(!s||s.hours===0) return;
+  const fromZ=(s._animZ!==undefined)?s._animZ:s.hours*UNIT;
+  s.hours=Math.max(0,s.hours-1);
+  if(s.log&&s.log.length) s.log.pop();
+  save(); updateStats();
+  animateCheckersTo(id, fromZ, s.hours*UNIT);
+  hideUndoToast();
+}
+function undoLastHour(){ if(!lastAddId) return; undoHour(lastAddId); lastAddId=null; }
+
+// ══ HOURS SHEET ══
+function openHoursSheet(){
+  renderHoursSheet();
+  document.getElementById('hours-sheet').classList.add('open');
+  document.getElementById('hours-overlay').classList.add('open');
+}
+function closeHoursSheet(){
+  document.getElementById('hours-sheet').classList.remove('open');
+  document.getElementById('hours-overlay').classList.remove('open');
+}
+
+function renderHoursSheet(){
+  const list = document.getElementById('hours-list');
+  list.innerHTML = '';
+  if(!streams.length){
+    list.innerHTML = '<p style="text-align:center;color:var(--muted);padding:24px 0;font-size:13px;">No streams yet — create one first</p>';
+    return;
+  }
+  streams.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'hrow';
+
+    const dot = document.createElement('div');
+    dot.className = 'hrow-dot';
+    dot.style.background = s.color;
+
+    const info = document.createElement('div');
+    info.className = 'hrow-info';
+    info.innerHTML = `<div class="hrow-name">${s.name}</div><div class="hrow-hours">${s.hours}${t('hoursUnit')} · ${streak(s)}${t('streak')}</div>`;
+
+    const acts = document.createElement('div');
+    acts.className = 'hrow-actions';
+
+    const addB = document.createElement('button');
+    addB.className = 'hrow-add';
+    addB.style.background = s.color;
+    addB.innerHTML = '+';
+    addB.onclick = e => { e.stopPropagation(); addHour(s.id); renderHoursSheet(); };
+
+    const undoB = document.createElement('button');
+    undoB.className = 'hrow-undo';
+    undoB.innerHTML = '↩';
+    undoB.disabled = s.hours === 0;
+    undoB.onclick = e => { e.stopPropagation(); undoHour(s.id); renderHoursSheet(); };
+
+    acts.appendChild(addB);
+    acts.appendChild(undoB);
+    row.appendChild(dot);
+    row.appendChild(info);
+    row.appendChild(acts);
+    list.appendChild(row);
+
+    // Long press → delete
+    let tmr=null, act=false;
+    const start = () => { act=true; row.classList.add('pressing'); tmr=setTimeout(()=>{ if(act){ closeHoursSheet(); openEditSheet(s.id); } row.classList.remove('pressing'); }, 600); };
+    const cancel = () => { act=false; clearTimeout(tmr); row.classList.remove('pressing'); };
+    row.addEventListener('touchstart', start, {passive:true});
+    row.addEventListener('touchend', cancel);
+    row.addEventListener('touchmove', cancel, {passive:true});
+    row.addEventListener('mousedown', start);
+    row.addEventListener('mouseup', cancel);
+    row.addEventListener('mouseleave', cancel);
+  });
+}
+
+function renderAll(){
+  streams.forEach(s=>{ s._animZ=s.hours*UNIT; });
+  render(); updateStats();
+}
+
+function streak(s){
+  if(!s.log||!s.log.length) return 0;
+  const today=ds(new Date());
+  const days=[...new Set(s.log)].sort().reverse();
+  if(days[0]!==today&&days[0]!==ds(yday())) return 0;
+  let st=1;
+  for(let i=1;i<days.length;i++){if((new Date(days[i-1])-new Date(days[i]))/86400000===1)st++;else break;}
+  return st;
+}
+// updateStats — defined below
+
+function showSavedToast(){
+  let t = document.getElementById('saved-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'saved-toast';
+    t.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-10px);background:rgba(34,197,94,0.9);color:#fff;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:600;z-index:9000;opacity:0;transition:all 0.3s;pointer-events:none;backdrop-filter:blur(10px);';
+    document.body.appendChild(t);
+  }
+  t.textContent = t('saved');
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(t._tmr);
+  t._tmr = setTimeout(() => { t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(-10px)'; }, 1500);
+}
+
+function showUndoToast(n){clearTimeout(undoTmr);document.getElementById('undo-msg').textContent=`+1h → "${n}"`;document.getElementById('undo-toast').classList.add('show');undoTmr=setTimeout(hideUndoToast,4500);}
+function hideUndoToast(){document.getElementById('undo-toast').classList.remove('show');}
+
+
+// ══ EDIT COLOR SHEET ══
+let _editExpanded = false;
+let _editId = null;
+
+function toggleEditExpand(){
+  _editExpanded = !_editExpanded;
+  const btn = document.getElementById('edit-see-all');
+  const grid = document.getElementById('edit-color-grid');
+  if(btn) btn.textContent = _editExpanded ? t('less') : t('seeAll');
+  const s = streams.find(s=>s.id===_editId);
+  if(!s) return;
+  grid.innerHTML = '';
+  if(_editExpanded){
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(6,1fr)';
+    grid.style.overflow = 'visible';
+    COLORS.forEach(c=>{
+      const sw=document.createElement('div'); sw.className='edit-swatch'+(c.bg===s.color?' sel':'');
+      sw.style.cssText=`background:${c.bg};flex-shrink:0;`;
+      sw.onclick=()=>{ s.color=c.bg; save(); render(); document.querySelectorAll('.edit-swatch').forEach(el=>el.classList.remove('sel')); sw.classList.add('sel'); };
+      grid.appendChild(sw);
+    });
+  } else {
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(6,1fr)';
+    grid.style.overflow = 'hidden';
+    COLORS.slice(0,6).forEach(c=>{
+      const sw=document.createElement('div'); sw.className='edit-swatch'+(c.bg===s.color?' sel':'');
+      sw.style.cssText=`background:${c.bg};flex-shrink:0;`;
+      sw.onclick=()=>{ s.color=c.bg; save(); render(); document.querySelectorAll('.edit-swatch').forEach(el=>el.classList.remove('sel')); sw.classList.add('sel'); };
+      grid.appendChild(sw);
+    });
+  }
+}
+
+function openEditSheet(id){
+  pendingEditId=id;
+  _editId=id;
+  _editExpanded=false;
+  const s=streams.find(s=>s.id===id); if(!s) return;
+  document.getElementById('edit-sheet-name').textContent=s.name;
+  const btn=document.getElementById('edit-see-all');
+  if(btn) btn.textContent=t('seeAll');
+  const grid=document.getElementById('edit-color-grid');
+  grid.style.display='grid';
+  grid.style.gridTemplateColumns='repeat(6,1fr)';
+  grid.style.flexWrap='';
+  grid.style.overflow='hidden';
+  grid.innerHTML='';
+  const colorsToShow = _editExpanded ? COLORS : COLORS.slice(0, 6);
+  colorsToShow.forEach((c,i)=>{
+    const sw=document.createElement('div'); sw.className='edit-swatch'+(c.bg===s.color?' sel':'');
+    sw.style.cssText=`background:${c.bg};flex-shrink:0;`;
+    sw.onclick=()=>{
+      s.color=c.bg; save(); render();
+      document.querySelectorAll('.edit-swatch').forEach(el=>el.classList.remove('sel'));
+      sw.classList.add('sel');
+    };
+    grid.appendChild(sw);
+  });
+  document.getElementById('edit-sheet').classList.add('open');
+  document.getElementById('edit-overlay').classList.add('open');
+}
+function closeEditSheet(){ pendingEditId=null; document.getElementById('edit-sheet').classList.remove('open'); document.getElementById('edit-overlay').classList.remove('open'); }
+function editDelete(){ const id=pendingEditId; if(!id) return; closeEditSheet(); setTimeout(()=>openDelSheet(id),50); }
+
+function openDelSheet(id){pendingDelId=id;const s=streams.find(s=>s.id===id);if(!s)return;document.getElementById('del-name').textContent=s.name;document.getElementById('del-meta').textContent=`${s.hours}h · ${streak(s)} day streak`;document.getElementById('del-sheet').classList.add('open');document.getElementById('del-overlay').classList.add('open');}
+function closeDelSheet(){pendingDelId=null;document.getElementById('del-sheet').classList.remove('open');document.getElementById('del-overlay').classList.remove('open');}
+function confirmDelete(){if(!pendingDelId)return;streams=streams.filter(s=>s.id!==pendingDelId);save();renderAll();closeDelSheet();}
+
+function openModal(){closeChart();document.getElementById('sname').value='';document.getElementById('modal-overlay').classList.add('open');setTimeout(()=>document.getElementById('sname').focus(),300);}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+function handleOverlayClick(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
+document.getElementById('sname').addEventListener('keydown',e=>{if(e.key==='Enter')createStream();});
+function createStream(){
+  const name=document.getElementById('sname').value.trim();if(!name)return;
+  const randColor=COLORS[Math.floor(Math.random()*COLORS.length)].bg;
+  const s={id:Date.now().toString(),name,color:randColor,hours:0,log:[],created:ds(new Date())};
+  s._animZ=0; streams.push(s); save(); closeModal(); renderAll();
+}
+
+function openChart(){
+  renderChart();
+  const p=document.getElementById('chart-panel');
+  p.classList.add('open');
+  // tap outside panel content closes it
+  setTimeout(()=>{
+    function onOverlayTap(e){ if(e.target===p){ closeChart(); p.removeEventListener('click',onOverlayTap); } }
+    p.addEventListener('click', onOverlayTap);
+  }, 300);
+}
+function closeChart(){document.getElementById('chart-panel').classList.remove('open');}
+function renderChart(){
+  const bars=document.getElementById('cbars');bars.innerHTML='';
+  if(!streams.length){bars.innerHTML='<p style="color:var(--muted);text-align:center;margin-top:40px;font-size:13px;">'+t('noStreams')+'</p>';return;}
+  const maxH=Math.max(...streams.map(s=>s.hours),1);
+  [...streams].sort((a,b)=>b.hours-a.hours).forEach((s,i)=>{
+    const pct=Math.max((s.hours/maxH)*100,s.hours>0?8:2);
+    const row=document.createElement('div');row.className='crow';
+    row.innerHTML=`<div class="crow-lbl"><span style="color:var(--muted);font-size:10px;font-family:monospace;margin-right:6px;min-width:14px;display:inline-block;">${i+1}</span>${s.name}</div><div class="crow-track"><div class="crow-fill" style="width:${pct}%;background:linear-gradient(90deg,${s.color}bb,${s.color});">${s.hours}${t('hoursUnit')}</div></div>`;
+    bars.appendChild(row);
+  });
+  const totalH=streams.reduce((a,s)=>a+s.hours,0);
+  const sum=document.createElement('div');
+  sum.style.cssText='margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;align-items:baseline;gap:8px;';
+  sum.innerHTML=`<div style="font-size:32px;font-weight:800;font-family:'SF Mono',ui-monospace,monospace;color:var(--accent)">${totalH}</div><div style="font-size:13px;color:var(--muted)">${t('totalHours2')}</div>`;
+  bars.appendChild(sum);
+}
+
+// ── Theme ──────────────────────────────────────────────────
+function toggleTheme(){
+  isDark = !isDark;
+  document.body.classList.toggle('light', !isDark);
+  localStorage.setItem('ds_theme', isDark ? 'dark' : 'light');
+  render();
+  spSyncTheme();
+}
+
+// ── Stats ───────────────────────────────────────────────────
+function updateStats(){
+  const totalH = streams.reduce((a,s)=>a+s.hours,0);
+  const el = document.getElementById('total-hours');
+  if(el) el.textContent = totalH + t('totalHours');
+}
+
+// ── Sync ────────────────────────────────────────────────────
+async function syncToCloud(){
+  if(!_sbUser) return;
+  try {
+    // Collect ALL maps data — maps index + every map's streams
+    const allMapsData = {};
+    for(const m of _maps){
+      const raw = await _capGet(_mapKey(m.id));
+      allMapsData[m.id] = raw ? JSON.parse(raw) : [];
+    }
+    const payload = {
+      maps: _maps,
+      activeMapId: _activeMapId,
+      mapsData: allMapsData
+    };
+    const { data: existing } = await _sb.from('streams')
+      .select('id').eq('user_id', _sbUser.id).maybeSingle();
+    let error;
+    if (existing) {
+      const r = await _sb.from('streams').update({
+        data: payload,
+        updated_at: new Date().toISOString()
+      }).eq('user_id', _sbUser.id);
+      error = r.error;
+    } else {
+      const r = await _sb.from('streams').insert({
+        user_id: _sbUser.id,
+        data: payload,
+        updated_at: new Date().toISOString()
+      });
+      error = r.error;
+    }
+    console.log('syncToCloud error:', JSON.stringify(error));
+    if (!error) showSavedToast();
+  } catch(e) { console.log('sync error', e); }
+}
+
+async function loadFromCloud() {
+  if (!_sbUser) return;
+  try {
+    const { data, error } = await _sb.from('streams')
+      .select('data')
+      .eq('user_id', _sbUser.id)
+      .maybeSingle();
+    console.log('loadFromCloud result:', JSON.stringify(data), JSON.stringify(error));
+    if (!error && data && data.data) {
+      const payload = data.data;
+      // New format: full maps structure
+      if (payload.maps && payload.mapsData) {
+        _maps = payload.maps;
+        _activeMapId = payload.activeMapId || _maps[0].id;
+        // Restore every map's streams to local storage
+        for(const m of _maps){
+          if(payload.mapsData[m.id]){
+            await _capSet(_mapKey(m.id), JSON.stringify(payload.mapsData[m.id]));
+          }
+        }
+        await _capSet('ds_maps', JSON.stringify(_maps));
+        await _capSet('ds_active_map', _activeMapId);
+        // Load active map into streams
+        await loadMap(_activeMapId);
+        renderAll();
+        updateStats();
+        spRenderMaps();
+      // Legacy format: plain array of streams (single map)
+      } else if (Array.isArray(payload)) {
+        streams = payload;
+        streams.forEach(s => { s._animZ = s.hours * UNIT; });
+        await save();
+        renderAll();
+        updateStats();
+      }
+    }
+  } catch(e) { console.log('load cloud error', e); }
+}
+
+// ── Auth ──────────────────────────────────────────────────────
+async function doSignIn() {
+  try {
+    // Generate PKCE verifier and store it natively before browser opens
+    const verifier = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2,"0")).join("");
+    const encoder = new TextEncoder();
+    const data2 = encoder.encode(verifier);
+    const hashBuf = await crypto.subtle.digest("SHA-256", data2);
+    const challenge = btoa(String.fromCharCode(...new Uint8Array(hashBuf)))
+      .replace(/\+/g,"-").replace(/\//g,"_").replace(/=/g,"");
+    // Store verifier natively so it survives WebView death
+    if (Cap) await Cap.set({ key: "pkce_verifier", value: verifier });
+    localStorage.setItem("pkce_verifier", verifier);
+    // Build OAuth URL manually with our challenge
+    const params = new URLSearchParams({
+      provider: "google",
+      redirect_to: "dstream://auth",
+      code_challenge: challenge,
+      code_challenge_method: "S256"
+    });
+    const authUrl = "https://ayxfpslgoihretkfbqwh.supabase.co/auth/v1/authorize?" + params.toString();
+    const { Browser } = window.Capacitor.Plugins;
+    await Browser.open({ url: authUrl });
+  } catch(e) { console.error('sign in error', e); }
+}
+
+// Handle OAuth code exchange from deep link URL
+async function _handleAuthUrl(url) {
+  if (!url) return false;
+  try {
+    // Try PKCE code exchange first
+    const qPart = url.includes("?") ? url.split("?")[1].split("#")[0] : "";
+    const qParams = new URLSearchParams(qPart);
+    const code = qParams.get("code");
+    if (code) {
+      // Restore verifier from native storage
+      let verifier = localStorage.getItem("pkce_verifier");
+      if (!verifier && Cap) {
+        const r = await Cap.get({ key: "pkce_verifier" });
+        verifier = r?.value || null;
+      }
+      if (verifier) {
+        const resp = await fetch("https://ayxfpslgoihretkfbqwh.supabase.co/auth/v1/token?grant_type=pkce", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": "sb_publishable_G9np31a1ppKTG2mgPaK50g_DteosV6x" },
+          body: JSON.stringify({ auth_code: code, code_verifier: verifier })
+        });
+        const json = await resp.json();
+        if (json.access_token) {
+          const { data } = await _sb.auth.setSession({ access_token: json.access_token, refresh_token: json.refresh_token || "" });
+          if (data?.session?.user) {
+            _sbUser = data.session.user;
+            if (Cap) await Cap.remove({ key: "pkce_verifier" });
+            localStorage.removeItem("pkce_verifier");
+            try { window.Capacitor.Plugins.Browser.close(); } catch(e) {}
+            spRefresh(); renderAll(); return true;
+          }
+        }
+      }
+    }
+    // Fallback: implicit flow tokens in fragment
+    const hashPart = url.includes("#") ? url.split("#").slice(1).join("#") : "";
+    const fragParams = new URLSearchParams(hashPart);
+    const accessToken = fragParams.get("access_token");
+    if (!accessToken) return false;
+    // Exchange Google access token for Supabase session via REST
+    console.log("attempting exchange, token length:", accessToken.length);
+    const resp = await fetch("https://ayxfpslgoihretkfbqwh.supabase.co/auth/v1/token?grant_type=google_id_token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": "sb_publishable_G9np31a1ppKTG2mgPaK50g_DteosV6x"
+      },
+      body: JSON.stringify({ access_token: accessToken })
+    });
+    const json = await resp.json();
+    console.log("exchange response:", JSON.stringify(json).substring(0,200));
+    if (json.access_token) {
+      const { data } = await _sb.auth.setSession({
+        access_token: json.access_token,
+        refresh_token: json.refresh_token || ""
+      });
+      if (data?.session?.user) {
+        _sbUser = data.session.user;
+        try { window.Capacitor.Plugins.Browser.close(); } catch(e) {}
+        spRefresh(); renderAll(); return true;
+      }
+    }
+  } catch(e) {}
+  return false;
+}
+
+// Check launch URL on startup (cold start deep link)
+(async function() {
+  try {
+    const { App } = window.Capacitor?.Plugins || {};
+    if (App) {
+      const { url } = await App.getLaunchUrl() || {};
+      if (url) await _handleAuthUrl(url);
+      App.addListener("appUrlOpen", async (data) => {
+        console.log("appUrlOpen:", data?.url);
+        await _handleAuthUrl(data?.url);
+      });
+    }
+  } catch(e) { console.error("App plugin error:", e); }
+})();
+
+// Listen for deep link return from OAuth
+(function(){
+  try {
+    const { App } = window.Capacitor.Plugins;
+    if (!App) return;
+    App.addListener('appUrlOpen', async (data) => {
+      console.log('appUrlOpen fired:', JSON.stringify(data));
+      if (!data || !data.url) return;
+      if (!data.url.startsWith('dstream://auth')) return;
+      try {
+        // Try getSessionFromUrl first, fall back to getSession
+        let user = null;
+        try {
+          const { data: s2 } = await _sb.auth.getSessionFromUrl({ url: data.url });
+          if (s2?.session?.user) user = s2.session.user;
+        } catch(e) {}
+        if (!user) {
+          const { data: s3 } = await _sb.auth.getSession();
+          if (s3?.session?.user) user = s3.session.user;
+        }
+        if (user) {
+          _sbUser = user;
+          try { window.Capacitor.Plugins.Browser.close(); } catch(e) {}
+          spRefresh();
+          await loadFromCloud();
+          await syncToCloud();
+        }
+      } catch(e) { console.error('deep link auth error', e); }
+    });
+  } catch(e) {}
+})();
+
+async function doSignOut(){
+  try { await _sb.auth.signOut(); } catch(e){}
+  _sbUser = null;
+  streams = [];
+  if (Cap) await Cap.remove({ key: "ls_v13" }).catch(()=>{});
+  localStorage.removeItem("ls_v13");
+  streams = [];
+  renderAll();
+  updateStats();
+  spRefresh();
+}
+
+async function doDeleteAccount() {
+  if (!confirm('Delete your account? Cloud data will be removed permanently.')) return;
+  try {
+    await _sb.from('streams').delete().eq('user_id', _sbUser.id);
+    await _sb.auth.signOut();
+    _sbUser = null;
+    spRefresh();
+  } catch(e) { console.error('delete error', e); }
+}
+
+// ── Side panel ────────────────────────────────────────────────
+function openSidePanel() {
+  const p = document.getElementById('side-panel');
+  const o = document.getElementById('side-overlay');
+  p.style.visibility = 'visible';
+  o.style.pointerEvents = 'all';
+  requestAnimationFrame(() => {
+    p.style.transform = 'translateX(0)';
+    o.style.opacity = '1';
+  });
+  _renderMapsList();
+  spRefresh();
+}
+
+function closeSidePanel() {
+  const p = document.getElementById('side-panel');
+  const o = document.getElementById('side-overlay');
+  p.style.transform = 'translateX(calc(-100% - 20px))';
+  o.style.opacity = '0';
+  o.style.pointerEvents = 'none';
+  setTimeout(() => { p.style.visibility = 'hidden'; }, 360);
+}
+
+function spRefresh() {
+  const status = document.getElementById('sp-status');
+  const statusSub = document.getElementById('sp-status-sub');
+  const avatarImg = document.getElementById('sp-avatar-img');
+  const avatarLetter = document.getElementById('sp-avatar-letter');
+  const syncStatus = document.getElementById('sp-sync-status');
+  const spOut = document.getElementById('sp-out');
+  const spIn = document.getElementById('sp-in');
+
+  if (_sbUser) {
+    const meta = _sbUser.user_metadata || {};
+    const name = meta.full_name || meta.name || _sbUser.email?.split('@')[0] || 'User';
+    const email = _sbUser.email || '';
+    const avatar = meta.avatar_url || meta.picture || '';
+    if (status) status.textContent = name;
+    if (statusSub) statusSub.textContent = email;
+    if (avatar && avatarImg) {
+      avatarImg.src = avatar;
+      avatarImg.style.display = 'block';
+      if (avatarLetter) avatarLetter.style.display = 'none';
+    } else if (avatarLetter) {
+      avatarLetter.textContent = name.charAt(0).toUpperCase();
+      if (avatarImg) avatarImg.style.display = 'none';
+    }
+    if (syncStatus) { syncStatus.style.display = 'block'; syncStatus.textContent = 'Streams backed up'; }
+    document.getElementById('sp-header').style.cursor = 'pointer';
+    if (spOut) spOut.style.display = 'none';
+    if (spIn) spIn.style.display = 'none';
+  } else {
+    if (status) status.textContent = SP_I18N[_spLang]?.notSignedIn || 'Not signed in';
+    if (statusSub) statusSub.textContent = '';
+    if (avatarLetter) { avatarLetter.textContent = '?'; avatarLetter.style.display = ''; }
+    if (avatarImg) avatarImg.style.display = 'none';
+    if (syncStatus) syncStatus.style.display = 'none';
+    document.getElementById('sp-header').style.cursor = 'default';
+    if (spOut) spOut.style.display = 'block';
+    if (spIn) spIn.style.display = 'none';
+  }
+  spSyncTheme();
+  spSyncLang();
+}
+
+function spHeaderTap() {
+  if (!_sbUser) return;
+  openProfilePanel();
+}
+
+function openProfilePanel() {
+  const meta = _sbUser?.user_metadata || {};
+  const name = meta.full_name || meta.name || _sbUser?.email?.split('@')[0] || 'User';
+  const email = _sbUser?.email || '';
+  const avatar = meta.avatar_url || meta.picture || '';
+  const nameEl = document.getElementById('sp-profile-name');
+  const emailEl = document.getElementById('sp-profile-email');
+  const imgEl = document.getElementById('sp-profile-avatar-img');
+  const letterEl = document.getElementById('sp-profile-avatar-letter');
+  const syncEl = document.getElementById('sp-profile-sync');
+  if (nameEl) nameEl.textContent = name;
+  if (emailEl) emailEl.textContent = email;
+  if (avatar && imgEl) {
+    imgEl.src = avatar; imgEl.style.display = 'block';
+    if (letterEl) letterEl.style.display = 'none';
+  } else if (letterEl) {
+    letterEl.textContent = name.charAt(0).toUpperCase();
+    letterEl.style.display = '';
+    if (imgEl) imgEl.style.display = 'none';
+  }
+  if (syncEl) syncEl.style.display = _sbUser ? 'block' : 'none';
+  const s = SP_I18N[_spLang] || SP_I18N.en;
+  const soL = document.getElementById('sp-profile-signout-label');
+  const daL = document.getElementById('sp-profile-delete-label');
+  if (soL) soL.textContent = s.signOut;
+  if (daL) daL.textContent = s.deleteAccount;
+  document.getElementById('sp-profile-panel').classList.add('open');
+}
+
+function closeProfilePanel() {
+  document.getElementById('sp-profile-panel').classList.remove('open');
+}
+
+// ── Maps panel ───────────────────────────────────────────────
+function _renderMapsList(){
+  const list = document.getElementById('sp-maps-list');
+  if(!list) return;
+  list.innerHTML = '';
+  _maps.forEach(m => {
+    const row = document.createElement('div');
+    row.className = 'sp-map-row' + (m.id === _activeMapId ? ' active' : '');
+    row.innerHTML = `
+      <div class="sp-map-dot"></div>
+      <div class="sp-map-name">${m.name}</div>
+      <button class="sp-map-more" onclick="event.stopPropagation();_mapOptions('${m.id}')">⋯</button>`;
+    row.onclick = () => { switchMap(m.id); };
+    list.appendChild(row);
+  });
+}
+
+let _mapOptionsId = null;
+
+function spNewMap(){
+  _mapOptionsId = null;
+  const sheet = document.getElementById('map-options-sheet');
+  const overlay = document.getElementById('map-options-overlay');
+  const nameEl = document.getElementById('map-options-name');
+  const input = document.getElementById('map-rename-input');
+  const delBtn = document.getElementById('map-delete-btn');
+  if(nameEl) nameEl.textContent = 'NEW MAP';
+  if(input) input.value = '';
+  if(delBtn) delBtn.style.display = 'none';
+  overlay.style.opacity = '1'; overlay.style.pointerEvents = 'all';
+  sheet.style.transform = 'translateY(0)';
+  setTimeout(()=>input?.focus(), 350);
+}
+
+function _mapOptions(id){
+  const m = _maps.find(m=>m.id===id);
+  if(!m) return;
+  _mapOptionsId = id;
+  const sheet = document.getElementById('map-options-sheet');
+  const overlay = document.getElementById('map-options-overlay');
+  const nameEl = document.getElementById('map-options-name');
+  const input = document.getElementById('map-rename-input');
+  const delBtn = document.getElementById('map-delete-btn');
+  if(nameEl) nameEl.textContent = m.name;
+  if(input){ input.value = m.name; }
+  if(delBtn) delBtn.style.display = _maps.length > 1 ? 'block' : 'none';
+  overlay.style.opacity = '1'; overlay.style.pointerEvents = 'all';
+  sheet.style.transform = 'translateY(0)';
+  setTimeout(()=>{ input?.focus(); input?.select(); }, 350);
+}
+
+function closeMapOptions(){
+  const sheet = document.getElementById('map-options-sheet');
+  const overlay = document.getElementById('map-options-overlay');
+  sheet.style.transform = 'translateY(100%)';
+  overlay.style.opacity = '0'; overlay.style.pointerEvents = 'none';
+  document.getElementById('map-rename-input')?.blur();
+}
+
+function confirmRenameMap(){
+  const input = document.getElementById('map-rename-input');
+  const name = input?.value?.trim();
+  if(!name) return;
+  if(_mapOptionsId){ renameMap(_mapOptionsId, name); }
+  else { createMap(name); }
+  closeMapOptions();
+}
+
+function confirmDeleteMap(){
+  const m = _maps.find(m=>m.id===_mapOptionsId);
+  if(!m) return;
+  closeMapOptions();
+  // Use native del sheet for consistent UX
+  setTimeout(()=>{
+    if(confirm('Delete "' + m.name + '"? All its streams will be lost.')) deleteMap(_mapOptionsId);
+  }, 300);
+}
+
+function spToggleTheme() { toggleTheme(); }
+
+async function spCheckSession() {
+  const { data: s } = await _sb.auth.getSession();
+  const user = s?.session?.user;
+  if (user) {
+    _sbUser = user;
+    spRefresh();
+    alert("Signed in as: " + user.email);
+  } else {
+    alert("No session found");
+  }
+}
+
+function spSyncTheme() {
+  const tog = document.getElementById('sp-theme-toggle');
+  const icon = document.getElementById('sp-theme-icon');
+  const label = document.getElementById('sp-theme-label');
+  const lang = _spLang;
+  if (isDark) {
+    if (tog) { tog.classList.remove('off'); }
+    if (icon) icon.textContent = '◑';
+    if (label) label.textContent = SP_I18N[lang]?.darkMode || 'Dark Mode';
+  } else {
+    if (tog) { tog.classList.add('off'); }
+    if (icon) icon.textContent = '○';
+    if (label) label.textContent = SP_I18N[lang]?.lightMode || 'Light Mode';
+  }
+}
+
+function spSignIn() { closeSidePanel(); setTimeout(doSignIn, 350); }
+function spSignOut() { closeSidePanel(); setTimeout(doSignOut, 350); }
+function spDeleteAccount() { doDeleteAccount(); closeSidePanel(); }
+
+// ── i18n ──────────────────────────────────────────────────────
+SP_I18N = {
+  en: {
+    darkMode: 'Dark Mode', lightMode: 'Light Mode',
+    language: 'Language', notSignedIn: 'Not signed in',
+    signIn: 'Sign in with Google', signOut: 'Sign Out',
+    deleteAccount: 'Delete Account',
+    ob_tagline: 'Track hours across\nevery area of your life',
+    ob_guest: 'Continue as Guest',
+    ob_note: 'Works offline. Sign in to back up across devices.'
+  },
+  ru: {
+    darkMode: 'Тёмная тема', lightMode: 'Светлая тема',
+    language: 'Язык', notSignedIn: 'Не вошли в систему',
+    signIn: 'Войти через Google', signOut: 'Выйти',
+    deleteAccount: 'Удалить аккаунт',
+    ob_tagline: 'Отслеживай часы в каждой\nсфере своей жизни',
+    ob_guest: 'Продолжить как гость',
+    ob_note: 'Работает офлайн. Войдите для синхронизации.'
+  }
+};
+
+
+function spSetLang(lang) {
+  _spLang = lang;
+  localStorage.setItem('ds_lang', lang);
+  localStorage.setItem('ls_lang', lang);
+  spSyncLang();
+  obSyncLang();
+  if(typeof setLang === 'function') setLang(lang);
+}
+
+function spSyncLang() {
+  const lang = _spLang;
+  const s = SP_I18N[lang] || SP_I18N.en;
+  const enBtn = document.getElementById('sp-en');
+  const ruBtn = document.getElementById('sp-ru');
+  if (enBtn) { enBtn.classList.toggle('active', lang==='en'); }
+  if (ruBtn) { ruBtn.classList.toggle('active', lang==='ru'); }
+  const gtEl = document.getElementById('sp-google-text');
+  if (gtEl) gtEl.textContent = s.signIn;
+  const soEl = document.getElementById('sp-signout-text');
+  if (soEl) soEl.textContent = s.signOut;
+  const daEl = document.getElementById('sp-delete-text');
+  if (daEl) daEl.textContent = s.deleteAccount;
+  const llEl = document.getElementById('sp-lang-label');
+  if (llEl) llEl.textContent = s.language;
+}
+
+// ── Onboarding ────────────────────────────────────────────────
+let _obStep = 0;
+const _OB_STEPS = 4;
+
+const _OB_STRINGS = {
+  en: {
+    t1: 'Track what you invest time in',
+    d1: 'Each area of your life gets a lane. Log hours and watch your progress move forward on the board.',
+    t2: 'One tap to log an hour',
+    d2: 'Tap a checker to select it, then tap + to add an hour. The checker moves deeper as hours grow.',
+    t3: 'Create separate maps',
+    d3: 'Work, personal, health — keep different areas in separate maps. Switch between them instantly.',
+    t4: 'Sync across devices',
+    d4: 'Sign in with Google to back up your data. Or start offline — sign in later.',
+    next: 'Next',
+    signIn: 'Sign in with Google',
+    guest: 'Continue as Guest',
+    skip: 'Skip',
+  },
+  ru: {
+    t1: 'Отслеживай куда уходит время',
+    d1: 'Каждая сфера жизни — своя дорожка. Записывай часы и наблюдай как шашка продвигается вперёд.',
+    t2: 'Один тап — один час',
+    d2: 'Нажми на шашку чтобы выделить, затем + чтобы добавить час. Шашка уходит глубже с ростом часов.',
+    t3: 'Создавай отдельные карты',
+    d3: 'Работа, личное, здоровье — веди разные сферы в отдельных картах. Переключайся мгновенно.',
+    t4: 'Синхронизация между устройствами',
+    d4: 'Войди через Google для резервной копии. Или начни офлайн — войди позже.',
+    next: 'Далее',
+    signIn: 'Войти через Google',
+    guest: 'Продолжить как гость',
+    skip: 'Пропустить',
+  }
+};
+
+function obSyncLang() {
+  const s = _OB_STRINGS[_spLang] || _OB_STRINGS.en;
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('ob-t1', s.t1); set('ob-d1', s.d1);
+  set('ob-t2', s.t2); set('ob-d2', s.d2);
+  set('ob-t3', s.t3); set('ob-d3', s.d3);
+  set('ob-t4', s.t4); set('ob-d4', s.d4);
+  set('ob-skip-text', s.skip);
+  const enBtn = document.getElementById('ob-en');
+  const ruBtn = document.getElementById('ob-ru');
+  if(enBtn) enBtn.classList.toggle('active', _spLang==='en');
+  if(ruBtn) ruBtn.classList.toggle('active', _spLang==='ru');
+  _obUpdateButtons();
+}
+
+function _obUpdateButtons() {
+  const s = _OB_STRINGS[_spLang] || _OB_STRINGS.en;
+  const primary = document.getElementById('ob-primary-label');
+  const secondary = document.getElementById('ob-secondary-label');
+  const secondaryBtn = document.getElementById('ob-secondary-btn');
+  if(_obStep < _OB_STEPS - 1) {
+    if(primary) primary.textContent = s.next;
+    if(secondary) secondary.textContent = s.guest;
+    if(secondaryBtn) secondaryBtn.style.display = 'block';
+  } else {
+    if(primary) primary.textContent = s.signIn;
+    if(secondary) secondary.textContent = s.guest;
+    if(secondaryBtn) secondaryBtn.style.display = 'block';
+  }
+}
+
+function _obGoTo(step) {
+  _obStep = Math.max(0, Math.min(_OB_STEPS-1, step));
+  const track = document.getElementById('ob-slides-track');
+  if(track) track.style.transform = 'translateX(-' + (_obStep * 100) + '%)';
+  for(let i=0; i<_OB_STEPS; i++){
+    const dot = document.getElementById('ob-dot-' + i);
+    if(dot) dot.classList.toggle('active', i===_obStep);
+  }
+  _obUpdateButtons();
+}
+
+function obPrimaryTap() {
+  if(_obStep < _OB_STEPS - 1) {
+    _obGoTo(_obStep + 1);
+  } else {
+    obSignIn();
+  }
+}
+
+function obSecondaryTap() { obGuest(); }
+
+function obSkipToSignIn() { _obGoTo(_OB_STEPS - 1); }
+
+function obSetLang(lang) { spSetLang(lang); obSyncLang(); }
+
+function obDismiss() {
+  const el = document.getElementById('onboard');
+  if (!el) return;
+  el.classList.add('out');
+  setTimeout(() => el.remove(), 400);
+  localStorage.setItem('ds_onboarded', '1');
+}
+
+function obSignIn() {
+  localStorage.setItem('ds_onboarded', '1');
+  obDismiss();
+  setTimeout(doSignIn, 400);
+}
+
+function obGuest() { obDismiss(); }
+
+function _obApplySystemTheme() {
+  const ob = document.getElementById('onboard');
+  if(!ob) return;
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  // Only apply system theme if user hasn't set one yet
+  if(!localStorage.getItem('ds_theme')) {
+    isDark = prefersDark;
+    document.body.classList.toggle('light', !isDark);
+    localStorage.setItem('ds_theme', isDark ? 'dark' : 'light');
+  }
+  ob.classList.add(isDark ? 'dark-ob' : 'light-ob');
+}
+
+// Init onboarding
+(function() {
+  _obApplySystemTheme();
+  obSyncLang();
+  _obGoTo(0);
+  spSyncLang();
+  spSyncTheme();
+  if (localStorage.getItem('ds_onboarded')) {
+    const el = document.getElementById('onboard');
+    if (el) el.remove();
+  }
+  // Check existing session
+  _sb.auth.getSession().then(({ data: s }) => {
+    if (s && s.session && s.session.user) {
+      _sbUser = s.session.user;
+      spRefresh();
+      loadFromCloud();
+    }
+  });
+  // Auth state changes
+  _sb.auth.onAuthStateChange((event, session) => {
+    _sbUser = session ? session.user : null;
+    spRefresh();
+    if (_sbUser && event === 'SIGNED_IN') {
+      loadFromCloud().then(() => syncToCloud());
+    }
+  });
+})();
+
+// ── Zoom to checker ─────────────────────────────────────────
+function _zoomToChecker(streamIndex) {
+  const s = streams[streamIndex];
+  if (!s) return;
+  const n = streams.length;
+  const laneX = (streamIndex - (n-1)/2) * LANE_GAP;
+  const cz = s._animZ !== undefined ? s._animZ : s.hours * UNIT;
+
+  // Target: center on this checker at comfortable zoom
+  const targetDist = Math.max(DIST_MIN * 1.4, 320);
+  const targetTz = cz - 40;
+  const targetTx = laneX;
+
+  const steps = 24;
+  const from = { dist:CAM.dist, tilt:CAM.tilt, az:CAM.azimuth, tx:CAM.tx, tz:CAM.tz };
+  const to = { dist:targetDist, tilt:22, az:180, tx:targetTx, tz:targetTz };
+  const ease = t => 1 - Math.pow(1-t, 3);
+  let step = 0;
+  function animate(){
+    step++;
+    const t = ease(step/steps);
+    CAM.dist    = from.dist + (to.dist - from.dist) * t;
+    CAM.tilt    = from.tilt + (to.tilt - from.tilt) * t;
+    CAM.azimuth = from.az   + (to.az   - from.az)   * t;
+    CAM.tx      = from.tx   + (to.tx   - from.tx)   * t;
+    CAM.tz      = from.tz   + (to.tz   - from.tz)   * t;
+    render();
+    if(step < steps) requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+}
+
+// ── fitAll — cycling view ─────────────────────────────────────
+let _fitMode = 0; // 0=all, 1=bottom, 2=mid, 3=top
+
+const _FIT_MODES = [
+  { icon: '⊡', label: 'ALL' },
+  { icon: '↓', label: 'LOW' },
+  { icon: '◈', label: 'MID' },
+  { icon: '↑', label: 'TOP' },
+];
+
+function _updateFitBtn() {
+  const m = _FIT_MODES[_fitMode];
+  const ic = document.getElementById('fit-icon');
+  const lb = document.getElementById('fit-label');
+  if (ic) ic.textContent = m.icon;
+  if (lb) lb.textContent = m.label;
+}
+
+function _getTierStreams(mode) {
+  if (streams.length === 0) return [];
+  const sorted = [...streams].sort((a, b) => a.hours - b.hours);
+  const n = sorted.length;
+  if (mode === 0) return sorted;
+
+  // Split by natural performance gaps, not equal headcount
+  // Find the two largest gaps in hours between adjacent streams
+  const maxH = sorted[n-1].hours;
+
+  // If all hours are 0, everything is LOW
+  if (maxH === 0) {
+    if (mode === 1) return sorted;
+    return [];
+  }
+
+  // Score each gap between adjacent streams
+  const gaps = [];
+  for (let i = 1; i < n; i++) {
+    gaps.push({ i, gap: sorted[i].hours - sorted[i-1].hours });
+  }
+  // Sort gaps descending — biggest gaps define tier boundaries
+  gaps.sort((a, b) => b.gap - a.gap);
+
+  // Pick up to 2 biggest gaps as boundaries, sort their indices
+  const boundaries = gaps.slice(0, 2).map(g => g.i).sort((a,b) => a-b);
+
+  let cut1, cut2;
+  if (boundaries.length >= 2 && boundaries[0] !== boundaries[1]) {
+    cut1 = boundaries[0]; // LOW/MID boundary
+    cut2 = boundaries[1]; // MID/TOP boundary
+  } else {
+    // Only one meaningful gap — split into LOW and TOP, no mid
+    cut1 = boundaries[0];
+    cut2 = boundaries[0];
+  }
+
+  // Ensure each tier has at least 1 stream
+  if (cut1 === 0) cut1 = 1;
+  if (cut2 >= n) cut2 = n - 1;
+  if (cut1 >= cut2) cut2 = Math.min(cut1 + 1, n);
+
+  const low = sorted.slice(0, cut1);
+  const mid = sorted.slice(cut1, cut2);
+  const top = sorted.slice(cut2);
+
+  // Update mode labels dynamically to reflect actual counts
+  _FIT_MODES[1].label = 'LOW·' + low.length;
+  _FIT_MODES[2].label = mid.length ? 'MID·' + mid.length : 'MID';
+  _FIT_MODES[3].label = 'TOP·' + top.length;
+
+  if (mode === 1) return low.length ? low : sorted.slice(0,1);
+  if (mode === 2) return mid.length ? mid : sorted.slice(0, Math.ceil(n/2));
+  if (mode === 3) return top.length ? top : sorted.slice(-1);
+  return sorted;
+}
+
+function fitAll() {
+  if (streams.length === 0) { goHome(); return; }
+
+  _fitMode = (_fitMode + 1) % 4;
+  if (streams.length < 3 && _fitMode > 1) _fitMode = 0;
+  _updateFitBtn();
+
+  const tier = _getTierStreams(_fitMode);
+  if (!tier.length) { _fitMode = 0; _updateFitBtn(); return; }
+
+  const TILT = 22;
+  const PAD_X = 60, PAD_TOP = 80, PAD_BOT = 60;
+
+  const n = streams.length;
+  const pts = tier.map(s => {
+    const i = streams.indexOf(s);
+    return { x: (i - (n-1)/2) * LANE_GAP, z: s.hours * UNIT };
+  });
+
+  const maxZ = Math.max(...pts.map(p=>p.z));
+  const minZ = Math.min(...pts.map(p=>p.z));
+  const minX = Math.min(...pts.map(p=>p.x));
+  const maxX = Math.max(...pts.map(p=>p.x));
+  const cx = (minX + maxX) / 2;
+
+  // For 0h checkers, add a small offset so camera doesn't target origin
+  const zSpan = maxZ - minZ;
+  const czBase = minZ + Math.max(zSpan * 0.5, UNIT * 2);
+
+  function screenPts(dist, tz) {
+    const cam = buildCameraFrom({dist, tilt:TILT, azimuth:180, tx:cx, tz, ty:0});
+    return pts.map(p => project(cam, {x:p.x, y:0, z:p.z})).filter(Boolean);
+  }
+
+  function allFit(dist, tz) {
+    const spts = screenPts(dist, tz);
+    if (spts.length < pts.length) return false;
+    for (const sp of spts) {
+      const r = Math.max(6, DISC_R * sp.scale) + 8; // include checker radius
+      if (sp.x - r < PAD_X || sp.x + r > W - PAD_X) return false;
+      if (sp.y - r < PAD_TOP || sp.y + r > H - PAD_BOT) return false;
+    }
+    return true;
+  }
+
+  // Binary search best dist
+  let lo = DIST_MIN, hi = DIST_MAX, bestDist = DIST_MAX;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (allFit(mid, czBase)) { bestDist = mid; hi = mid; }
+    else lo = mid;
+  }
+
+  // Binary search best tz to vertically center the group on screen
+  let tzLo = minZ - UNIT*4, tzHi = maxZ + UNIT*8, bestTz = czBase;
+  for (let i = 0; i < 24; i++) {
+    const tzMid = (tzLo + tzHi) / 2;
+    const spts = screenPts(bestDist, tzMid);
+    if (!spts.length) { tzLo = tzMid; continue; }
+    const minSY = Math.min(...spts.map(s=>s.y));
+    const maxSY = Math.max(...spts.map(s=>s.y));
+    const topGap = minSY - PAD_TOP;
+    const botGap = (H - PAD_BOT) - maxSY;
+    if (topGap > botGap) tzHi = tzMid; // too much top space, shift tz down
+    else tzLo = tzMid;
+    bestTz = tzMid;
+  }
+
+  bestDist = Math.min(bestDist * 1.08, DIST_MAX);
+
+  // Animate to tier, then flash highlight checkers for 2s
+  const steps = 28;
+  const from = { dist:CAM.dist, tilt:CAM.tilt, az:CAM.azimuth, tx:CAM.tx, tz:CAM.tz };
+  const to = { dist:bestDist, tilt:TILT, az:180, tx:cx, tz:bestTz };
+  const ease = t => 1 - Math.pow(1-t, 3);
+  let step = 0;
+  function animate() {
+    step++;
+    const t = ease(step/steps);
+    CAM.dist    = from.dist + (to.dist - from.dist) * t;
+    CAM.tilt    = from.tilt + (to.tilt - from.tilt) * t;
+    CAM.azimuth = from.az   + (to.az   - from.az)   * t;
+    CAM.tx      = from.tx   + (to.tx   - from.tx)   * t;
+    CAM.tz      = from.tz   + (to.tz   - from.tz)   * t;
+    render();
+    if (step < steps) requestAnimationFrame(animate);
+    else if (_fitMode !== 0) _flashTierCheckers(tier);
+  }
+  requestAnimationFrame(animate);
+}
+
+// Flash highlight tier checkers for 2s after camera lands
+let _flashIds = [];
+let _flashTmr = null;
+function _flashTierCheckers(tier) {
+  _flashIds = tier.map(s => s.id);
+  clearTimeout(_flashTmr);
+  render();
+  _flashTmr = setTimeout(() => { _flashIds = []; render(); }, 2000);
+}
+
+// Init button label on load
+_updateFitBtn();
+
+// ── Double-tap-hold zoom ──────────────────────────────────────
+(function(){
+  const cvs = document.getElementById('canvas');
+  if (!cvs) return;
+  let lastTap = 0, holdActive = false, holdStartY = 0, holdZoomStart = 0;
+  cvs.addEventListener('touchstart', function(e) {
+    if (e.touches.length !== 1) { holdActive = false; return; }
+    const now = Date.now(), dt = now - lastTap;
+    if (dt < 300 && dt > 30) {
+      e.preventDefault();
+      holdActive = true;
+      holdStartY = e.touches[0].clientY;
+      holdZoomStart = CAM.dist;
+    }
+    lastTap = now;
+  }, { passive: false });
+  cvs.addEventListener('touchmove', function(e) {
+    if (!holdActive || e.touches.length !== 1) return;
+    e.preventDefault();
+    const dy = e.touches[0].clientY - holdStartY;
+    CAM.dist = Math.max(DIST_MIN, Math.min(DIST_MAX, holdZoomStart * Math.pow(1.003, -dy)));
+    requestRender();
+  }, { passive: false });
+  cvs.addEventListener('touchend', function() { holdActive = false; });
+})();
+
+// ── App init ──
+resizeCanvas();
+applyLang();
+load().then(async () => {
+  render();
+  updateStats();
+  // Check for pending OAuth URL stored by MainActivity
+  try {
+    if (Cap) {
+      const r = await Cap.get({ key: "pending_auth_url" });
+      if (r?.value) {
+        console.log("PENDING AUTH URL:", r.value.substring(0, 200));
+        await Cap.remove({ key: "pending_auth_url" });
+        await _handleAuthUrl(r.value);
+      }
+    }
+  } catch(e) {}
+});
+initCP();
+
+</script>
+
+</body>
+</html>
