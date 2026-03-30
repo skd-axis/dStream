@@ -3302,23 +3302,24 @@ async function checkForUpdate(){
     if(!r.ok) return;
     const v = await r.json();
     if(v.build > APP_BUILD){
-      // Show update toast
-      let t = document.getElementById('update-toast');
-      if(!t){
-        t = document.createElement('div');
-        t.id = 'update-toast';
-        t.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:5000;' +
-          'background:rgba(124,106,247,0.95);color:#fff;padding:12px 20px;border-radius:20px;' +
-          'font-family:-apple-system,sans-serif;font-size:13px;font-weight:600;' +
-          'display:flex;align-items:center;gap:12px;box-shadow:0 4px 24px rgba(124,106,247,0.4);' +
-          'backdrop-filter:blur(20px);cursor:pointer;';
-        t.innerHTML = '<span>New version available</span>' +
-          '<a href="' + v.apk_url + '" style="color:#fff;background:rgba(255,255,255,0.25);' +
-          'padding:4px 12px;border-radius:12px;text-decoration:none;font-size:12px;">Download</a>' +
-          '<span onclick="document.getElementById('update-toast').remove()" ' +
-          'style="opacity:0.6;font-size:16px;cursor:pointer;">✕</span>';
-        document.body.appendChild(t);
-      }
+      if(document.getElementById('update-toast')) return;
+      const t = document.createElement('div');
+      t.id = 'update-toast';
+      t.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:5000;background:rgba(124,106,247,0.95);color:#fff;padding:12px 20px;border-radius:20px;font-family:-apple-system,sans-serif;font-size:13px;font-weight:600;display:flex;align-items:center;gap:12px;box-shadow:0 4px 24px rgba(124,106,247,0.4);backdrop-filter:blur(20px);';
+      const msg = document.createElement('span');
+      msg.textContent = 'New version available';
+      const dl = document.createElement('a');
+      dl.href = v.apk_url;
+      dl.textContent = 'Download';
+      dl.style.cssText = 'color:#fff;background:rgba(255,255,255,0.25);padding:4px 12px;border-radius:12px;text-decoration:none;font-size:12px;';
+      const close = document.createElement('span');
+      close.textContent = '✕';
+      close.style.cssText = 'opacity:0.6;font-size:16px;cursor:pointer;';
+      close.onclick = function(){ t.remove(); };
+      t.appendChild(msg);
+      t.appendChild(dl);
+      t.appendChild(close);
+      document.body.appendChild(t);
     }
   } catch(e) {}
 }
